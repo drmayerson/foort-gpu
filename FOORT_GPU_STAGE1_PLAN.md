@@ -66,7 +66,7 @@ Repository: `https://github.com/drmayerson/foort` (C++17). Read `AGENTS.md` firs
 
 ### 2.2 Existing GPU code by the user
 
-`https://github.com/drmayerson/drmayerson.github.io`, folder `zwart-gat-camera/index.html`: WebGL (1/2) fragment shader with **analytic** Kerr null geodesics via Carlson elliptic integrals (`kRF`, `kRJ`, `kerrCore`, `kerrLens`), observer at `CAM_D = 200`. Architecture: an expensive `MAP_PASS` that is recomputed only when parameters change (`dirty` flag) and a cheap `DISPLAY_PASS` every frame. Use (a) its Carlson `R_F` implementation if needed, (b) its `kerrLens` output as an independent analytic cross-check of escape directions for Kerr (M3), and (c) its two-pass architecture as precedent for ours.
+`https://github.com/drmayerson/bh-camera`, file `index.html` (formerly `zwart-gat-camera/` in drmayerson.github.io): WebGL (1/2) fragment shader with **analytic** Kerr null geodesics via Carlson elliptic integrals (`kRF`, `kRJ`, `kerrCore`, `kerrLens`), observer at `CAM_D = 200`. Architecture: an expensive `MAP_PASS` that is recomputed only when parameters change (`dirty` flag) and a cheap `DISPLAY_PASS` every frame. Use (a) its Carlson `R_F` implementation if needed, (b) its `kerrLens` output as an independent analytic cross-check of escape directions for Kerr (M3), and (c) its two-pass architecture as precedent for ours.
 
 ### 2.3 Physics references
 
