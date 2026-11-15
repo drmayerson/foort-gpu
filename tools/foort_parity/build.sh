@@ -5,7 +5,7 @@
 # Plain IEEE double: no -ffast-math, no -march (so no FMA contraction), matching FOORT's default build.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
-FOORT="${1:-${FOORT_DIR:-$HERE/../../../../../Coding/FOORT GitHub/FOORT}}"
+FOORT="${1:-${FOORT_DIR:-$HERE/../../../../Coding/FOORT GitHub/FOORT}}"
 SRC="$FOORT/FOORT/src"
 [ -f "$SRC/Metric.cpp" ] || { echo "FOORT sources not found at $SRC (pass the clone path)"; exit 1; }
 mkdir -p "$HERE/build"

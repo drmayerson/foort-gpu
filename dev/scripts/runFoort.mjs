@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { CASES, foortConfig } from './foortCases.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const foortDir = process.env.FOORT_DIR ?? resolve(here, '../../../../../Coding/FOORT GitHub/FOORT');
+const foortDir = process.env.FOORT_DIR ?? resolve(here, '../../../../Coding/FOORT GitHub/FOORT');
 const exe = join(foortDir, 'FOORT', 'bin', process.platform === 'win32' ? 'FOORT.exe' : 'FOORT');
 const args = process.argv.slice(2);
 const iN = args.indexOf('--N');

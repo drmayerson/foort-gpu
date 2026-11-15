@@ -460,3 +460,4 @@ non-trivial implementation choice.
 - 2026-11-14 — **P4, not done:**
   - **Fluid table:** it is already cached per λ within a visit (the bake client's cache). Caching it across visits was left out.
   - **8-bit noise:** it would halve the 8 MB download. It needs a new field format and a visual check, and with the download off the critical path the gain is smaller. Left for later.
+- 2026-11-15 — **D1 superseded, own repo:** FOORT-GPU moved out of `drmayerson.github.io` into its own repository `drmayerson/foort-gpu` (history kept), served by GitHub Pages at the same address <https://drmayerson.github.io/foort-gpu/>. Paths that read `foort-gpu/…` elsewhere in these notes are now relative to this repository's root. The default FOORT checkout path in `tools/foort_parity/build.sh` and `dev/scripts/runFoort.mjs` moved up one level less, so it still resolves when this repo is cloned where the old site repo was; `FOORT_DIR` still overrides it.
