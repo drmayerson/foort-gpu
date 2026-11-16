@@ -67,6 +67,7 @@ export function viewFromState(s, coarseTables = false, autoTier = 'high') {
   const [nx, nth] = String(s.grid).split('x').map(Number);
   const metric = metricIdFromState(s), metricParams = metricParamsFromState(s).params;
   const M = createMetric(metric, metricParams).massADM;
+  const tier = s.quality === 'auto' ? autoTier : s.quality;
   return {
     metric, metricParams,
     // a path the metric does not have falls back: analytic = Kerr only, closed = metrics with a generated shader
@@ -81,7 +82,21 @@ export function viewFromState(s, coarseTables = false, autoTier = 'high') {
     fluid: { xi: s.xi, betaR: s.betaR, betaPhi: s.betaPhi, model: s.fluidModel },
     texelReuse: !!s.texelReuse, compact: s.compact ? { n1: Number(s.compactN1) } : null,
     tailEmission: { redshiftPower: s.redshiftPower, fudge: s.fudge, maxPasses: Number(s.maxPasses) },
+    stopOut: stopOutOf(s, metric, tier),
   };
+}
+
+/**
+ * Review P7 (gated at Normal and High, 2026-11-16): outgoing rays stop beyond R_out = 60 M when nothing shows their
+ * escape direction: black holes, the emission view without a background sky, a tier with trades (not Reference), no
+ * FOORT-parity crossings. 11-17% fewer steps, 1.12-1.47x faster at Normal; the disc emission, delays and light curve
+ * pass the quality gate. Returns the stop radius in units of M (0: off).
+ * @param {Record<string, any>} s @param {string} metric @param {string} tier
+ */
+export function stopOutOf(s, metric, tier) {
+  const on = s.stopOut !== false && metricEntry(metric).mode === 'BH' && s.view === 'emission' && s.sky === 'none'
+    && tier !== 'reference' && s.quality !== 'custom' && s.crossing !== 'foort';
+  return on ? 60 : 0;
 }
 
 /**
@@ -547,6 +562,8 @@ async function main() {
   const notePreview = (k, ms) => { const old = pipeline.rateMs.get(k); pipeline.rateMs.set(k, old ? Math.sqrt(old * ms) : ms); };
   let runId = 0;
   let lastBake = '';
+  /** review P7: the outgoing stop of the last final trace (a sky or view change that toggles it re-traces) */
+  let lastStopOut = 0;
   /** @type {import('./fluid/fluidTable.js').FluidTable|null} */
   let lastFluid = null;
   /** URL and remembered view @param {Record<string, any>} [s] */
@@ -620,6 +637,7 @@ async function main() {
       const fb = await bakes.get(fs);
       if (id !== runId) return null;
       setup = gpuTraceSetup(view, tables, fb.tables);
+      if (final) lastStopOut = view.stopOut ?? 0;
       const levels = final ? finalLevels(s.N) : [previewStride(setup, s.N)];
       prog.levels = levels; prog.t0 = performance.now(); prog.on = final;
       const st = await pipeline.trace(setup, { levels, measureSteps: final && state.ui === 'expert', final, keep: state.compare !== 'off', store: final || state.compare !== 'off' });
@@ -847,6 +865,12 @@ async function main() {
     if (key === 'noiseField' || key === 'metric' || key === 'lambda' || key === 'bh0') refreshNoise();
     if (state.compare !== 'off') layoutCompare();
     if (key === 'sky') ensureSky(state.sky);
+    // review P7: the sky or the view switches the outgoing stop on or off: the records differ, so trace again
+    if ((key === 'sky' || key === 'view') && !retrace) {
+      const mode = metricEntry(metricIdFromState(state)).mode;
+      const want = stopOutOf(state, metricIdFromState(state), state.quality === 'auto' ? autoTiers[mode] ?? 'high' : state.quality);
+      if (want !== lastStopOut) { retrace = true; final = true; }
+    }
     if (key === 'N') controls.set('resAuto', false);
     if (key === 'resAuto' && state.resAuto) { fit(); return; }
     if (['sky', 'timeAvg', 'play', 'lambda', 'a', 'inc', 'bh0', 'sigmaN'].includes(key)) updateCaption();
@@ -1018,6 +1042,7 @@ async function main() {
       ['EMMU', s.mu], ['EMGAMMA', s.gamma], ['EMSIGMA', s.sigma], ['REDSHPOW', s.redshiftPower], ['FUDGE', s.fudge],
       ['FLXI', s.xi, 'fluid sub-Keplerian xi'], ['FLBETAR', s.betaR], ['FLBETAP', s.betaPhi], ['FLMODEL', s.fluidModel],
       ['ISCO', lastFluid?.isco ?? -1, 'fluid ISCO (coordinate r; -1: none)'],
+      ['STOPOUT', lastStopOut, 'outgoing rays stopped beyond (M; 0: off): theta, phi not asymptotic'],
     ];
     return cards;
   };

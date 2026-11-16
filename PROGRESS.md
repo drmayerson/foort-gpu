@@ -1758,3 +1758,21 @@ FOORT built from v1.0.0's sources (`sh tools/foort_parity/build.sh`). All M2 par
   - "Copy link (fixed quality)".
 - **Tests:** Vitest 167 and Playwright 63, in two clean runs; tsc clean.
 - **Deploying from now on:** after a merge into main, `node dev/scripts/stamp.mjs`, then commit `version.json`.
+
+## Review package 10: step savings (P7, 2026-11-16)
+
+| idea | gate (black holes, vs Reference) | A/B vs Normal (GPU time, steps) | decision |
+|---|---|---|---|
+| stop outgoing rays beyond 60 M | passes all budgets at Normal and at High (sky directions excluded by design) | 1.12–1.47×, steps −11 to −17% | adopted: emission view without a sky, High and Normal, black holes |
+| far steps up to 16× under BS3 | — | 0.92–1.15× (noise), steps ×1.003 | rejected: no saving |
+| horizon cut at 1.05 r₊ (Normal) | fails Reissner–Nordström emission L1 and flux | 1.00–1.09×, steps −4 to −6% | rejected |
+
+- **Reports:** `dev/reports/b10/gate_p7_*.md`, `ab_*.json`.
+- **Tests:** `review10.spec.js` checks the rules (on with no sky; off with a sky, a direction view, Reference or the fuzzball; toggling re-traces) and the step saving.
+- **Totals:** Vitest 167 and Playwright 64, in two clean runs; tsc clean.
+
+### The review, done
+
+- **Packages 1–10:** done.
+- **Kept for later, by the user's decisions:** P2 (tier policy) and E7 (retrograde disc, disc radii, zero-angular-momentum camera).
+- **Left as they are:** the P8 minor items.

@@ -76,7 +76,7 @@ const int TERM_HORIZON = 1, TERM_BOUNDARY = 2, TERM_TIMEOUT = 3, TERM_NAN = 4, T
 #ifdef BS3
 uniform vec4 uBS;       // B6 embedded integrator: error tolerance (rad), step cap factor on FOORT's eps, 0, 0
 #endif
-uniform vec4 uFar;      // larger steps at large r (M9 accuracy trade): eps *= clamp(r / r_far, 1, k_max); x = r_far (0: off), y = k_max
+uniform vec4 uFar;      // larger steps at large r (M9 accuracy trade): eps *= clamp(r / r_far, 1, k_max); x = r_far (0: off), y = k_max; z: stop outgoing rays beyond it (review P7; 0: off)
 
 float adaptiveStep(vec4 pos, vec4 v) {
   float eps = uStep.x;
@@ -301,6 +301,9 @@ void main() {
     if (!finite4(pos) || !all(lessThan(abs(mom), vec2(1e30))) || !(abs(xStageMin) < 1e30)) tc = TERM_NAN;
     else if (r < rTerm || radiusOf(xStageMin) < rTerm) tc = TERM_HORIZON;
     else if (r > rB) tc = TERM_BOUNDARY;
+    // review P7 (gated): outgoing rays beyond uFar.z stop as escaped (emission views without a sky: their direction is
+    // that of the position at uFar.z, not the asymptotic one); 0: off
+    else if (uFar.z > 0.0 && r > uFar.z && mom.x > 0.0) tc = TERM_BOUNDARY;
     else if (steps > maxSteps) tc = TERM_TIMEOUT;
     else if (nearSingularity(r, pos.y, hemi)) tc = TERM_SINGULARITY;
 

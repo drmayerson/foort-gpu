@@ -37,6 +37,8 @@ export const FLUID_DEFAULTS = { xi: 1, betaR: 1, betaPhi: 1, model: /** @type {'
  * @property {boolean} [tableHalf]                 M9 accuracy trade: half-float derivative channels in the tables
  * @property {{r:number, max:number}|null} [farSteps]  M9 accuracy trade: step parameter eps * clamp(r / farSteps.r, 1, farSteps.max),
  *                                                 farSteps.r in units of M_ADM
+ * @property {number} [stopOut]                     review P7 (gated): stop outgoing rays beyond this radius (units of M_ADM; 0: off):
+ *                                                 for emission views without a sky only (the escape direction is then not asymptotic)
  * @property {boolean} [project]                   constraint projection onto H = 0 before every step
  *                                                 (default: on for horizonless metrics, whose throat rays lose the constraint)
  * @property {number} [axisStepFloor]              floor of the axis distance in FOORT's step rule (1e-3)
@@ -81,7 +83,7 @@ export function tailGeometry(m, v) {
 
 export const VIEW_DEFAULTS = {
   tailEmission: { redshiftPower: 3, fudge: 1, maxPasses: 0 },
-  tableHalf: false, g34: true, texelReuse: false, compact: /** @type {{n1:number}|null} */ (null), refine: /** @type {import('./refine.js').RefineParams|null} */ (null), bs3: /** @type {{tol:number, cap:number}|null} */ (null), farSteps: /** @type {{r:number, max:number}|null} */ (null),
+  tableHalf: false, g34: true, texelReuse: false, compact: /** @type {{n1:number}|null} */ (null), refine: /** @type {import('./refine.js').RefineParams|null} */ (null), bs3: /** @type {{tol:number, cap:number}|null} */ (null), farSteps: /** @type {{r:number, max:number}|null} */ (null), stopOut: 0,
   eps: 0.03, hmin: 1e-12, maxSteps: 5000, epsHorizon: 0.01, radial: 'logShifted', crossing: 'interpolate',
   mesh: 'centers', threshold: 0.001, storeH: false, axisStepFloor: 1e-3, path: 'tabulated', grid: { nx: 512, nth: 128 }, fluid: FLUID_DEFAULTS,
 };
@@ -214,7 +216,7 @@ export function gpuTraceSetup(viewIn, tables, fluid) {
     uAux: ['4f', [v.threshold, v.axisStepFloor, theta <= Math.PI / 2 ? 1 : -1, viewProjects(metric, v) ? 1 : 0]],
     uTail: ['4f', [0, 0, 0, 0]],
     uTailEm: ['4f', [v.tailEmission.redshiftPower, v.tailEmission.fudge, v.tailEmission.maxPasses, 0]],
-    uFar: ['4f', v.farSteps ? [v.farSteps.r * metric.massADM, v.farSteps.max, 0, 0] : [0, 1, 0, 0]],
+    uFar: ['4f', [v.farSteps ? v.farSteps.r * metric.massADM : 0, v.farSteps ? v.farSteps.max : 1, v.stopOut ? v.stopOut * metric.massADM : 0, 0]],
     // B6 embedded integrator: the tolerance as an angle (tol x the pixel's angle at the camera), the step cap factor
     uBS: ['4f', v.bs3 ? [v.bs3.tol * v.camera.screen / (v.N * v.camera.r), v.bs3.cap, 0, 0] : [1, 1, 0, 0]],
     uOpt: ['4i', [v.maxSteps, v.crossing === 'foort' ? 1 : 0, v.mesh === 'foort' ? 1 : 0, v.storeH ? 1 : 0]],

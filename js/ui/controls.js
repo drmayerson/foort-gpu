@@ -188,6 +188,8 @@ export const CONTROLS = [
   // adopted at checkpoint B5: faster on all three GPUs measured (1.2-3.2x)
   { key: 'texelReuse', label: 'reuse table texels across RK stages (exact; 1.2–3× faster)', type: 'checkbox', group: 'Tracing', default: true },
   { key: 'compact', label: 'ray compaction (exact; trace long rays as a dense image after 1500 steps)', type: 'checkbox', group: 'Tracing', default: false },
+  // review P7 (gated): stop outgoing rays beyond 60 M when nothing shows their direction (emission view, no sky)
+  { key: 'stopOut', label: 'stop outgoing rays beyond 60 M when no sky is shown (black holes, High and Normal; gated, 1.1–1.5× faster)', type: 'checkbox', group: 'Tracing', default: true },
   { key: 'pretrace', label: 'idle pre-tracing of neighbouring views (λ ± one notch, inclination ± 5°; off on phones)', type: 'checkbox', group: 'Tracing', default: true, retrace: false },
   // B7 expert: the B6 options for custom quality, the compaction threshold, the record cache
   { key: 'integrator', label: 'integrator', type: 'select', group: 'Tracing', options: ['rk4', 'bs3'],

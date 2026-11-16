@@ -1,0 +1,48 @@
+{
+ "idea": "epsHorizon",
+ "date": "2026-11-16T19:17:33.063Z",
+ "rows": [
+  {
+   "scene": "kerr_a0_inc17",
+   "normalMs": 46.905800000000006,
+   "ideaMs": 46.762319999999995,
+   "speedup": 1.0030682823264545,
+   "stepRatio": 0.9528181133545042
+  },
+  {
+   "scene": "kerr_a0.94_inc17",
+   "normalMs": 81.15419999999999,
+   "ideaMs": 80.52052,
+   "speedup": 1.0078697951776763,
+   "stepRatio": 0.9583421198438689
+  },
+  {
+   "scene": "kerr_a0.94_inc80",
+   "normalMs": 79.36164,
+   "ideaMs": 76.3672,
+   "speedup": 1.0392110749117422,
+   "stepRatio": 0.9535391057643007
+  },
+  {
+   "scene": "johannsen",
+   "normalMs": 130.85585,
+   "ideaMs": 123.27412000000002,
+   "speedup": 1.0615030145824604,
+   "stepRatio": 0.9365068622728435
+  },
+  {
+   "scene": "mankoNovikov",
+   "normalMs": 328.77459999999996,
+   "ideaMs": 328.5665599999999,
+   "speedup": 1.0006331745993873,
+   "stepRatio": 1
+  },
+  {
+   "scene": "rn_Q0.8",
+   "normalMs": 59.02495999999999,
+   "ideaMs": 54.04883999999999,
+   "speedup": 1.0920671007925424,
+   "stepRatio": 0.9632710445575412
+  }
+ ]
+}

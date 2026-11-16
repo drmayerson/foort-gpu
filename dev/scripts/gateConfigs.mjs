@@ -58,6 +58,23 @@ export const GATE_CONFIGS = {
     description: 'Normal (confirmed at B6): black holes High + Bogacki-Shampine 3(2) at tol 0.1; the fuzzball = High.',
     apply: (s) => ({ ...high(s), ...(s.fuzzball ? {} : { bs3: { tol: 0.1, cap: 4 } }) }),
   },
+  // review P7 (2026-11-16): three step savings on top of Normal, black holes only (the fuzzball's Normal = High)
+  p7_far16: {
+    description: 'P7: Normal with larger steps far out under BS3 error control (eps * clamp(r / 20 M, 1, 16) instead of up to 4).',
+    apply: (s) => (s.fuzzball ? high(s) : { ...high(s), farSteps: { r: 20, max: 16 }, bs3: { tol: 0.1, cap: 4 } }),
+  },
+  p7_hor05: {
+    description: 'P7: Normal, captured rays stopped at 1.05 r+ instead of 1.01 r+.',
+    apply: (s) => (s.fuzzball ? high(s) : { ...high(s), bs3: { tol: 0.1, cap: 4 }, epsHorizon: 0.05 }),
+  },
+  p7_stopout_high: {
+    description: 'P7: High, outgoing rays stopped beyond 60 M (black holes; emission views without a sky only).',
+    apply: (s) => (s.fuzzball ? high(s) : { ...high(s), stopOut: 60 }),
+  },
+  p7_stopout: {
+    description: 'P7: Normal, outgoing rays stopped beyond 60 M (emission views without a sky only; the sky measure does not apply).',
+    apply: (s) => (s.fuzzball ? high(s) : { ...high(s), bs3: { tol: 0.1, cap: 4 }, stopOut: 60 }),
+  },
   // Stage 1B B6, plan 4.2-1: an embedded error-controlled integrator (Bogacki-Shampine 3(2), FSAL), tolerance = tol x the
   // pixel's angle at the camera, steps capped at FOORT's rule x 4
   ...Object.fromEntries([0.1, 0.3, 1].map((tol) => [`bs3_tol${tol}`, {

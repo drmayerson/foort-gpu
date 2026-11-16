@@ -1,0 +1,48 @@
+{
+ "idea": "far16",
+ "date": "2026-11-16T19:17:04.952Z",
+ "rows": [
+  {
+   "scene": "kerr_a0_inc17",
+   "normalMs": 43.31156000000001,
+   "ideaMs": 47.16325,
+   "speedup": 0.9183328120941625,
+   "stepRatio": 1.0028898082314166
+  },
+  {
+   "scene": "kerr_a0.94_inc17",
+   "normalMs": 68.60452,
+   "ideaMs": 73.21893,
+   "speedup": 0.936977909947605,
+   "stepRatio": 1.002781878149361
+  },
+  {
+   "scene": "kerr_a0.94_inc80",
+   "normalMs": 78.70684,
+   "ideaMs": 78.78999999999999,
+   "speedup": 0.9989445361086433,
+   "stepRatio": 1.0028931987785625
+  },
+  {
+   "scene": "johannsen",
+   "normalMs": 130.94396,
+   "ideaMs": 131.52161,
+   "speedup": 0.9956079461010248,
+   "stepRatio": 1.0027956927085073
+  },
+  {
+   "scene": "mankoNovikov",
+   "normalMs": 305.48199999999997,
+   "ideaMs": 308.25024,
+   "speedup": 0.9910195041535084,
+   "stepRatio": 1.0030104638257156
+  },
+  {
+   "scene": "rn_Q0.8",
+   "normalMs": 61.631479999999996,
+   "ideaMs": 53.470319999999994,
+   "speedup": 1.1526297205627347,
+   "stepRatio": 1.0029460036451312
+  }
+ ]
+}

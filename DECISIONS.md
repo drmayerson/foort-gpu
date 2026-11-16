@@ -558,3 +558,19 @@ User, verbatim where quoted:
   - **Where it appears:** snapshots carry tEXt chunks `foort-gpu-commit`, `foort-gpu-tier` (the resolved tier) and `foort-gpu-fixed-url` (quality and N fixed, resAuto off), and "Copy link (fixed quality)" in the menu gives the same link. The FITS headers and the performance table show the version.
 - 2026-11-16 — **E5:** clamps, camera moves and setup warnings get a notes box under the image in both panels; the status-line suffix stays for the expert panel and tests.
 - 2026-11-16 — **E6:** a colour bar on the image for the scalar views (g₁, delay, |H|, n = 1 delay, steps, noise), from the same inferno as the shaders, and burned into snapshots with the other overlays.
+
+## Review package 10: step savings (P7, 2026-11-16)
+
+- 2026-11-16 — **Package 10 started** (user: "go for package 10"), on branch `review-10`.
+- 2026-11-16 — **Method:** each idea was gated with `qualityGate.mjs` (13 scenes against Reference, 512²), configurations `p7_*` in `gateConfigs.mjs`, reports in `dev/reports/b10/`. Its speed was measured as A/B against the Normal tier itself, alternating, median of 7, on 6 black-hole scenes (`dev/scripts/r10Ab.mjs`). The cross-run speed-ups of the gate are too noisy on this integrated GPU to compare tiers (ratios 0.9–1.4 for the same change).
+- 2026-11-16 — **Adopted: the outgoing stop.** Outgoing rays stop as escaped beyond R_out = 60 M, the radius beyond which the Johnson-SU profiles of every preset are below 1e-4 of their peak (review C1).
+  - **Gate:** at Normal and at High it passes every budget on the 8 black-hole scenes. The emission is unchanged within the budgets (High: relative L1 ≤ 7.8e-4 against Reference), as are the delays (p99 ≤ 0.05 M) and the light curve.
+  - **Speed at Normal:** 11–17% fewer steps, 1.12–1.47× faster.
+  - **Escape directions:** they become those of the position at 60 M (sky error 56–74 px p99), so the stop is on only when nothing shows them. That means black holes, the emission view with the sky set to "none", the High or Normal tier (not Reference, not custom), and no FOORT-parity crossings.
+  - **Viewer behaviour:** a sky or view change that turns the stop on or off re-traces. An expert checkbox switches it off, and the FITS header records it (`STOPOUT`).
+  - **Effect on the defaults:** with the Deep Field sky on by default, the default view does not use it; it helps the expert and anyone who turns the sky off.
+- 2026-11-16 — **Rejected: far steps up to 16× under BS3.** There is no saving: steps ×1.003 and time 0.92–1.15× (noise). With error control the step is limited by the error estimate and the BS3 cap, not by the far-step factor.
+- 2026-11-16 — **Rejected: the horizon cut at 1.05 r₊ for Normal.**
+  - **Gate:** it fails Reissner–Nordström Q = 0.8 on emission L1 (4.2e-3) and flux (3.5e-3), since the plunging gas just outside its horizon emits measurably.
+  - **Gain:** 4–6% fewer steps but 1.00–1.09× in time, too little to justify a per-metric rule.
+- 2026-11-16 — **Not part of P7, left as they are:** the review's P8 minor items. These are `preserveDrawingBuffer` (the snapshot and video rely on it) and the display pass shading N² pixels at any on-screen size; since review U6 the resolution follows the on-screen size.
