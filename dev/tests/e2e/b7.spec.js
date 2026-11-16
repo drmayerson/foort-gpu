@@ -123,6 +123,7 @@ test('B7: the last view is remembered; the URL wins; reset restores the defaults
   await page.waitForFunction(() => window.__foort, null, { timeout: 60_000 });
   expect(await page.evaluate(() => window.__foort.state.inc)).toBe(21);
   await done(page);
+  await page.click('#menu summary');   // (2026-11-16: in the toolbar's "More" menu)
   await page.click('#resetView');
   await page.waitForFunction(() => window.__foort, null, { timeout: 60_000 });
   expect(await page.evaluate(() => window.__foort.state.inc)).toBe(17);

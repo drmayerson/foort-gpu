@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build the FOORT parity harness against a local, unmodified FOORT clone.
 # Usage: sh tools/foort_parity/build.sh [path/to/FOORT clone]
-# Output: tools/foort_parity/build/metric_dump(.exe), fluid_dump(.exe)  (git-ignored)
+# Output: tools/foort_parity/build/metric_dump(.exe), fluid_dump(.exe), foort/FOORT(.exe)  (git-ignored)
 # Plain IEEE double: no -ffast-math, no -march (so no FMA contraction), matching FOORT's default build.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -17,4 +17,8 @@ CXX="${CXX:-g++}"
 "$CXX" -std=c++17 -O2 -ffp-contract=off -D_USE_MATH_DEFINES -I"$SRC" \
   "$HERE/fluid_dump.cpp" "$SRC/DiagnosticsEmission.cpp" "$SRC/Metric.cpp" "$SRC/InputOutput.cpp" "$SRC/Spline.cpp" \
   -o "$HERE/build/fluid_dump"
+# FOORT itself (its Release flags: -O3 -DNDEBUG, OpenMP), for the image parity runs (dev/scripts/runFoort.mjs), so that
+# they run the sources of the clone (FOORT/bin/FOORT.exe of the clone may be older than its sources)
+mkdir -p "$HERE/build/foort"
+"$CXX" -std=c++17 -O3 -DNDEBUG -fopenmp -D_USE_MATH_DEFINES -I"$SRC" "$SRC"/*.cpp -o "$HERE/build/foort/FOORT"
 echo "built $HERE/build/metric_dump (FOORT at $FOORT, commit $(git -C "$FOORT" rev-parse --short HEAD 2>/dev/null || echo unknown))"

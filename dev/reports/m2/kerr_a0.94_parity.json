@@ -3,7 +3,7 @@
  "mode": "parity",
  "pixels": 16384,
  "stride": 1,
- "cpuSeconds": 17.837,
+ "cpuSeconds": 14.801,
  "fourColorAgreement": 1,
  "fourColorMismatches": 0,
  "passesAgreement": 1,
@@ -17,7 +17,7 @@
  },
  "confusion": {
   "escape->escape": 11006,
-  "horizon->horizon": 5378
+  "other->horizon": 5378
  },
  "meanSteps": 693.4097290039062,
  "hEscape": {

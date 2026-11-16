@@ -37,6 +37,9 @@ test('B9: a short video at a fixed observer-time step (one noise period), with p
   await ready(page, 'N=128&play=0&pretrace=0&inc=60&vidSeconds=1&vidFps=24&vidLoop=1');
   const fmt = await page.evaluate(async () => (await import('/js/export.js')).videoFormat());
   test.skip(!fmt, 'this browser offers no MediaRecorder format');
+  // (2026-11-16: the record button is in the toolbar's "More" menu, the video settings under the panel's "More settings")
+  const openMenu = async () => { if (!(await page.locator('#menu').evaluate((el) => el.open))) await page.click('#menu summary'); };
+  await openMenu();
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60_000 }), page.click('#record')]);
   expect(dl.suggestedFilename()).toMatch(/\.(webm|mp4)$/);
   await expect(page.locator('#status')).toContainText('video saved: 24 frames');
@@ -44,8 +47,10 @@ test('B9: a short video at a fixed observer-time step (one noise period), with p
   await expect(page.locator('#clock')).toContainText('t = 0.0 M');
   // cancel a longer one
   await page.locator('#view').focus();
+  await page.locator('details.normalMore').evaluate((el) => { el.open = true; });
   await page.selectOption('select[name=vidFps]', '30');
   await page.locator('input[name=vidSeconds]').evaluate((el) => { el.value = '20'; el.dispatchEvent(new Event('change')); });
+  await openMenu();
   await page.click('#record');
   await expect(page.locator('#progressText')).toContainText('recording');
   await page.click('#cancel');

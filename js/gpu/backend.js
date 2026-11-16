@@ -9,7 +9,8 @@
  * @typedef {{mode:number, lo:number, hi:number, maxSteps:number, rCam:number, storeH:boolean,
  *   emission?: import('../fluid/emission.js').EmissionParams, exposure?: number, toneMap?: number, colorMap?: number,
  *   time?: DisplayTime, tail?: TailGeometry|null, envelope?: 'coordinate'|'circumferential', azimuth?: number,
- *   zoom?: {s:number, ox:number, oy:number}, post?: {blurSigmaPx?: number, lightCurve?: boolean}}} DisplayView
+ *   zoom?: {s:number, ox:number, oy:number}, post?: {blurSigmaPx?: number, lightCurve?: boolean},
+ *   sky?: {name: string, mode: number, level: number, half: number, camTheta: number}}} DisplayView
  *   post (B8): draw the disc emission linearly, then the light-curve sum, the telescope blur (sigma in full-resolution
  *   pixels) and the tone map
  *   azimuth: camera azimuth in rad, display-only (Stage 1B B5); zoom: instant digital zoom while re-tracing (B7)
@@ -29,6 +30,8 @@
  * @property {(t:import('../bake/bake.js').BakedTables) => void} uploadTables  metric tables of the tabulated tracer
  * @property {(f:import('../fluid/fluidTable.js').FluidTable) => void} uploadFluid  fluid four-velocity table (both tracers)
  * @property {(f:import('../noise/noiseField.js').NoiseField, name?:string) => void} uploadNoise  noise field (3D texture), display pass; kept by name (B7)
+ * @property {(name:string, img:TexImageSource) => void} uploadSky  review U3: a background sky picture (2D texture), kept by name
+ * @property {(name:string) => boolean} hasSky
  * @property {(strides?:number[]) => void} clearRecords                mark every pixel untraced; the strides the next trace uses
  * @property {(stride:number) => {w:number, h:number}} levelSize   size of the progressive level `stride` (1, 2, 4, 8)
  * @property {(rect:Rect, stride:number, toCompact?:boolean) => Promise<{wallMs:number, gpuMs:Promise<number|null>}>} traceTile

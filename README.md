@@ -29,14 +29,20 @@ A new trace runs whenever the spacetime, camera, fluid or tracing settings chang
 
 ### Panels and interaction
 
-- **Two panels (Stage 1B B7):** the **normal** panel (the default) has the spacetime family (black hole or fuzzball), the spin or λ (the λ slider's lowest position is λ = 0, the supersymmetric black hole), the viewing angle, field of view and azimuth, brightness and a time-averaged disc, play and speed, and compare. The **expert** panel (button "Expert panel", key `e`, URL `ui=expert`) has every control below. Switching keeps the state.
+- **Two panels:**
+  - **Simple panel** (the default; review packages 7-8): the object (black hole or fuzzball), the spin or λ (the λ slider's lowest position is λ = 0, the supersymmetric black hole), the viewing angle, field of view, "walk around" (the azimuth), the background, play, a calm (time-averaged) disc and compare; brightness, speed, telescope blur, light curve, units, pixel inspector and export are under "More settings". Quick views: face-on, edge-on, not spinning, fast spin, fuzzball next to black hole.
+  - **Under the image:** a plain caption for the spacetime shown, and "What am I looking at?", which labels the shadow, the photon ring, the brighter (approaching) and dimmer sides and the lensed far side of the disc.
+  - **Expert panel** (button "Expert panel", key `e`, URL `ui=expert`): every control below, with the status line, clock and legend under the image. Switching keeps the state.
+- **Language:** English or Dutch (the EN/NL switch, or `?lang=nl`), shared with the homepage. The simple panel, the toolbar, the captions and the help are translated; the expert panel stays in English.
+- **Background sky:** a picture behind the black hole (the BH camera's: the Hubble Ultra Deep Field by default, the Pillars of Creation, Earth, the Moon, Earthrise, or a generated star field), lensed: each escaped ray shows the picture in its final direction, so "walk around" turns it. Seen from 1000 M a background at infinity has an Einstein ring of about 63 M, larger than the default field of view, so all of it is strongly lensed; the picture's half-width is twice the Einstein angle, and the repeated copies near the shadow are the higher-order images. Display only (no extra trace).
+- **Layout:** the image fills the window left of the panel, which scrolls on its own; on a phone the image stays pinned at the top while the panel scrolls under it. The resolution follows the image's size on screen (256², 512² or 1024², as far as the predicted trace time allows) unless a link or the expert panel sets it.
 - **On the image:**
   - drag left–right for the azimuth (instant) and up–down for the viewing angle (a preview while dragging, the full image on release);
   - the wheel or a pinch zooms, showing a digital zoom of the current image at once while it re-traces;
   - shift-drag or a two-finger drag pans.
 - **Keys:** space play/pause, arrows, `+`/`−`, `c` compare, `b` blink A/B, `e` panel, `h` hide panel, `f` fullscreen, `s` snapshot (PNG), `?` help.
 - **Remembered view:** the last view is remembered in the browser; a link's own settings take precedence. "Reset to defaults" forgets it.
-- **Long traces:** a progress bar shows the time left, with a cancel button. Before a trace predicted to take over 15 s, the viewer asks first.
+- **Long traces:** a progress box on the (dimmed) image shows how far the trace is, with a cancel button, also while the device is measured or tables are baked. Before a trace predicted to take over 15 s, the viewer asks first.
 - **Compare (normal and expert):** two images A and B share the camera and the clock, shown split screen (drag the divider), side by side, or blinking.
   - In the normal panel, B is the other family at the same settings (Kerr a = 0 against the fuzzball).
   - In the expert panel, "the panel edits" switches between A and B, so B can differ in anything.
@@ -63,8 +69,8 @@ A new trace runs whenever the spacetime, camera, fluid or tracing settings chang
 |---|---|
 | **Spacetime** | the metric and its parameters (sliders clamp to each metric's valid range); for ST3Cr, a log-scale λ slider and a "λ = 0" switch to the supersymmetric black hole |
 | **Camera** | distance, inclination, screen size and centre (units of M); the camera azimuth only redraws (the spacetimes are axisymmetric) |
-| **Disc emission** | FOORT presets (KerrExample, JohannsenExample, Test_MNrun, Test_FBdetail); Johnson-SU μ, γ, σ; redshift power; geometric fudge factor and number of passes; the fluid's sub-Keplerian ξ and radial-infall β_r, β_φ; exposure (auto: the 99.5th percentile), tone map, colour map |
-| **Time** | play/pause, speed (M per second), slow vs fast light, noise field (auto: by metric and λ; or a fixed inoisy field, or the placeholder), noise amplitude σₙ, optional procedural advection of the field with the fluid |
+| **Disc emission** | FOORT presets (KerrExample, JohannsenExample, Test_MNrun, Test_FBdetail); Johnson-SU μ, γ, σ; redshift power; geometric fudge factor and number of passes; the fluid's sub-Keplerian ξ and radial-infall β_r, β_φ; exposure (auto: the 99.5th percentile of the time-averaged disc, divided by exp(k σₙ − σₙ²/2) with k = 1.5, room for the turbulence's bright fluctuations), tone map (default: sqrt with a soft shoulder, no flat white), colour map |
+| **Time** | play/pause, speed (M per second), slow vs fast light, noise field (auto: by metric and λ; or a fixed inoisy field, or the placeholder), noise amplitude σₙ (0.6 by default since review package 7; 1 before), optional procedural advection of the field with the fluid |
 | **Tracing** | quality tier (auto: the best that traces the image within 2 s for black holes / 10 s for the fuzzball on this device; Reference, High, Normal, or custom with ε, far steps and max steps), metric evaluation (auto: closed-form shaders for Kerr, Johannsen and RN, tables for Manko–Novikov and the fuzzball; or forced), resolution, metric table size, the step parameter ε (FOORT's 0.03), larger steps beyond 20 M (on by default: about 20% faster, escape directions within about 3e-4 rad), max steps (5000; for the fuzzball the disc image is the same as with 10000), FOORT-parity or interpolated disc crossings, recording the constraint \|H\|; exact speed options (texel reuse, ray compaction) and idle pre-tracing |
 | **View** | disc emission, or a debug view: four-colour screen, termination, steps, redshift g₁, delay, crossings, sky grid, \|H\|, noise, n = 1 image delay, noise coverage |
 
@@ -111,7 +117,8 @@ The complete state is in the URL query, for example `?metric=st3cr&lambda=0.001&
 | `js/fluid/` | FOORT's fluid model (port), its GPU table, Johnson-SU and the disc emission |
 | `js/noise/` | noise-field contract, loader and sampler |
 | `js/ref/` | the double-precision CPU reference tracer (tests and validation) |
-| `js/ui/` | controls (built from `CONTROLS` and the metric registry, normal and expert levels), URL state, interaction on the image, readouts (light curve, inspector) |
+| `js/ui/` | controls (built from `CONTROLS` and the metric registry; the simple panel's groups `NORMAL_MAIN` / `NORMAL_MORE`), URL state, interaction on the image, readouts (light curve, inspector), `i18n.js` (English and Dutch strings and simple-panel labels), `lay.js` (captions, explanation labels, help, fitting the image) |
+| `js/sky.js`, `sky/` | the background sky: the BH camera's pictures (NASA/ESA credits in `SKY_PICTURES`) and the generated star field |
 | `js/units.js`, `js/export.js` | physical units and presets; PNG and video export |
 | `shaders/glsl/` | `common.glsl` (tracer core: RK4 or BS3, crossings, tail, compaction), `trace.glsl` (tabulated metric, or a closed form), `closed/` (generated closed-form metrics), `trace_kerr_analytic.glsl` (hand-written closed-form Kerr), `display.glsl` (emission and debug views), `post.glsl` (beam, light curve, tone map) |
 | `noise/` | noise fields in the contract format |

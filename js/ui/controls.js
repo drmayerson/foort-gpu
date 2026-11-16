@@ -1,6 +1,7 @@
 // @ts-check
 import { METRICS } from '../metrics/registry.js';
 import { UNIT_PRESETS, unitsOf, formatLength } from '../units.js';
+import { controlLabel, optionLabel, t } from './i18n.js';
 // Viewer controls: a declarative list of parameters -> form widgets, URL-synced state.
 // Sliders report 'input' while dragging (coarse preview) and 'change' on release (full trace).
 
@@ -77,7 +78,7 @@ function metricParamControls() {
       visible: (s) => ids.includes(s.metric) && (s.ui !== 'normal' || spec.name !== 'a' || s.metric === 'kerr'), metricParam: true });
   }
   for (const m of METRICS) if (m.zeroSwitch)
-    out.push({ key: m.zeroSwitch.key, label: m.zeroSwitch.label, type: 'checkbox', group: 'Spacetime', default: false, visible: (s) => s.metric === m.id, level: 'both' });
+    out.push({ key: m.zeroSwitch.key, label: m.zeroSwitch.label, type: 'checkbox', group: 'Spacetime', default: false, visible: (s) => s.metric === m.id });
   return out;
 }
 /** state key of a metric's zero-limit switch (registry zeroSwitch.key), or '' @param {string} id */
@@ -103,6 +104,9 @@ export const CONTROLS = [
   { key: 'cx', label: 'screen centre α (M)', type: 'number', group: 'Camera', step: 0.1, default: 0 },
   { key: 'cy', label: 'screen centre β (M)', type: 'number', group: 'Camera', step: 0.1, default: 0 },
   { key: 'N', label: 'resolution', type: 'select', group: 'Tracing', options: [128, 256, 512, 1024, 2048], default: 512 },
+  // review U6: the resolution follows the image's size on screen (x device pixel ratio, 256-1024) when the predicted trace
+  // time allows; setting N (here or in a link) turns it off
+  { key: 'resAuto', label: 'resolution from the on-screen size (256–1024)', type: 'checkbox', group: 'Tracing', default: true },
   { key: 'preset', label: 'FOORT preset (metric, camera, emission)', type: 'select', group: 'Disc emission',
     options: ['custom', 'KerrExample', 'JohannsenExample', 'Test_MNrun', 'Test_FBdetail', 'Compare 1A: Kerr a = 0', 'Compare 1B: ST3Cr λ = 0.005',
       'Compare 2A: Kerr a = 0', 'Compare 2B: ST3Cr λ = 0 (BH)', 'Compare 3A: Kerr a = 0.5', 'Compare 3B: ST3Cr λ = 0.05'], default: 'custom', retrace: false },
@@ -151,8 +155,12 @@ export const CONTROLS = [
     visible: (s) => s.units !== 'M' },
   { key: 'exposure', label: 'exposure', type: 'range', group: 'Disc emission', min: 0.01, max: 1000, scale: 'log', default: 1, format: sig, retrace: false,
     visible: (s) => !s.autoExposure },
-  { key: 'toneMap', label: 'tone map', type: 'select', group: 'Disc emission', options: [0, 1, 2, 3],
-    optionLabels: { 0: 'linear', 1: 'sqrt', 2: 'log', 3: 'asinh' }, default: 1, retrace: false },
+  // review U4: 'soft' is sqrt with a soft shoulder (no flat white), the default since 2026-11-16 (was sqrt)
+  { key: 'toneMap', label: 'tone map', type: 'select', group: 'Disc emission', options: [0, 1, 2, 3, 4],
+    optionLabels: { 0: 'linear', 1: 'sqrt', 2: 'log', 3: 'asinh', 4: 'soft (sqrt with a soft shoulder)' }, default: 4, retrace: false },
+  // review U4: the auto exposure leaves room for the noise's bright fluctuations, exp(k sigma_n - sigma_n^2 / 2)
+  { key: 'noiseHeadroom', label: 'auto exposure: noise headroom k (σₙ)', type: 'range', group: 'Disc emission', min: 0, max: 3, step: 0.1, default: 1.5, format: fmt(1), retrace: false,
+    visible: (s) => s.autoExposure },
   { key: 'colorMap', label: 'colour map', type: 'select', group: 'Disc emission', options: [0, 1, 2],
     optionLabels: { 0: 'afmhot', 1: 'inferno', 2: 'grey' }, default: 0, retrace: false },
   { key: 'play', label: 'play', type: 'checkbox', group: 'Time', default: true, retrace: false, level: 'both' },
@@ -163,7 +171,7 @@ export const CONTROLS = [
     optionLabels: { auto: 'auto (black holes: Lee & Gammie disc; fuzzball: nearest λ anchor)', inoisy_lg21: 'inoisy, Lee & Gammie 2021 disc, Keplerian (M8)',
       'inoisy_st3cr_l0': 'inoisy, ST3Cr λ = 0 flow (B4)', 'inoisy_st3cr_l1e-3': 'inoisy, ST3Cr λ = 1e-3 flow (B4)', 'inoisy_st3cr_l5e-3': 'inoisy, ST3Cr λ = 5e-3 flow (B4)',
       'inoisy_st3cr_l0.05': 'inoisy, ST3Cr λ = 0.05 flow (B4)', placeholder: 'placeholder FFT field (M7)' }, default: 'auto', retrace: false },
-  { key: 'sigmaN', label: 'noise amplitude σₙ', type: 'range', group: 'Time', min: 0, max: 2, step: 0.05, default: 1, format: fmt(2), retrace: false },
+  { key: 'sigmaN', label: 'noise amplitude σₙ', type: 'range', group: 'Time', min: 0, max: 2, step: 0.05, default: 0.6, format: fmt(2), retrace: false },
   { key: 'advect', label: 'procedural advection (rotate the field with the fluid)', type: 'checkbox', group: 'Time', default: false, retrace: false },
   { key: 'advectD', label: 'advection crossfade period D (M)', type: 'range', group: 'Time', min: 2, max: 500, scale: 'log', default: 40, format: sig, retrace: false,
     visible: (s) => s.advect },
@@ -198,6 +206,12 @@ export const CONTROLS = [
   { key: 'storeH', label: 'record |H| (replaces crossing 3)', type: 'checkbox', group: 'Tracing', default: false },
   { key: 'view', label: 'debug view', type: 'select', group: 'View', options: Object.keys(VIEWS),
     optionLabels: Object.fromEntries(Object.entries(VIEWS).map(([k, v]) => [k, v.label])), default: 'emission', retrace: false },
+  // review U3: a lensed background sky behind the disc (display only): a star field or a picture of the bh-camera
+  { key: 'sky', label: 'background sky (emission view)', type: 'select', group: 'View', options: ['none', 'stars', 'deep-field', 'pillars', 'earth', 'moon', 'earthrise'],
+    optionLabels: { none: 'none (black)', stars: 'star field', 'deep-field': 'Hubble Ultra Deep Field', pillars: 'Pillars of Creation', earth: 'Earth (Apollo 17)', moon: 'Moon (Apollo 11)', earthrise: 'Earthrise (Apollo 8)' },
+    default: 'deep-field', retrace: false, level: 'both' },
+  { key: 'skyLevel', label: 'background brightness', type: 'range', group: 'View', min: 0.05, max: 1, step: 0.05, default: 0.6, format: fmt(2), retrace: false, level: 'both',
+    visible: (s) => s.sky !== 'none' },
   { key: 'lo', label: 'range low', type: 'number', group: 'View', step: 0.1, default: NaN, retrace: false,
     visible: (s) => 'lo' in VIEWS[s.view] },
   { key: 'hi', label: 'range high', type: 'number', group: 'View', step: 0.1, default: NaN, retrace: false,
@@ -214,7 +228,12 @@ export const CONTROLS = [
 
 /** keys A and B share in compare mode (camera, observer time, display) */
 export const SHARED_KEYS = ['snapBurn', 'vidSeconds', 'vidFps', 'vidLoop', 'units', 'unitMass', 'unitDist', 'realTime', 'blur', 'beamUas', 'beamM', 'lightcurve', 'lcOrders', 'inspect', 'ui', 'inc', 'screen', 'az', 'cx', 'cy', 'r', 'N', 'play', 'speed', 'slowLight', 'view', 'lo', 'hi', 'toneMap', 'colorMap',
-  'autoExposure', 'exposure', 'brightness', 'timeAvg', 'compare', 'cmpEdit', 'blinkHz', 'cmpDiv', 'quality', 'pretrace', 'cacheMB', 'family'];
+  'autoExposure', 'exposure', 'brightness', 'timeAvg', 'compare', 'cmpEdit', 'blinkHz', 'cmpDiv', 'quality', 'pretrace', 'cacheMB', 'family', 'sky', 'skyLevel', 'resAuto', 'noiseHeadroom'];
+
+/** review U7: the simple panel: about eight controls, the rest behind "More" (in this order) */
+export const NORMAL_MAIN = ['family', 'a', 'lambda', 'inc', 'screen', 'az', 'sky', 'play', 'timeAvg', 'compare', 'blinkHz'];
+export const NORMAL_MORE = ['skyLevel', 'brightness', 'speed', 'blur', 'beamUas', 'beamM', 'lightcurve', 'units', 'unitMass', 'unitDist', 'realTime', 'inspect',
+  'snapBurn', 'vidSeconds', 'vidFps', 'vidLoop'];
 
 const SLIDER_STEPS = 1000;
 
@@ -312,6 +331,7 @@ export function buildControls(form, state, onChange) {
         const op = document.createElement('option');
         op.value = String(o);
         op.textContent = c.optionLabels?.[String(o)] ?? String(o);
+        op.dataset.label = op.textContent;
         sel.appendChild(op);
       }
       sel.value = String(state[c.key]);
@@ -362,17 +382,45 @@ export function buildControls(form, state, onChange) {
       input.addEventListener('change', handler(true));
     } else input.addEventListener('change', handler(true));
   }
+  // review U7: the simple panel's two groups (rows move between them and their expert groups on a panel switch)
+  const mainFs = document.createElement('fieldset');
+  mainFs.className = 'normalMain';
+  mainFs.innerHTML = '<legend></legend>';
+  const moreDet = document.createElement('details');
+  moreDet.className = 'normalMore';
+  moreDet.innerHTML = '<summary></summary>';
+  const moreFs = document.createElement('fieldset');
+  moreDet.appendChild(moreFs);
+  form.prepend(mainFs, moreDet);
+  let arranged = '';
+  const arrange = () => {
+    const mode = state.ui === 'normal' ? 'normal' : 'expert';
+    if (mode !== arranged) {
+      arranged = mode;
+      if (mode === 'normal') {
+        for (const k of NORMAL_MAIN) { const w = widgets.find((x) => x.c.key === k); if (w) mainFs.appendChild(w.row); }
+        for (const k of NORMAL_MORE) { const w = widgets.find((x) => x.c.key === k); if (w) moreFs.appendChild(w.row); }
+      } else for (const w of widgets) groups[w.c.group].appendChild(w.row);
+    }
+    mainFs.hidden = moreDet.hidden = mode !== 'normal';
+    /** @type {HTMLElement} */ (mainFs.firstChild).textContent = t('grpView');
+    /** @type {HTMLElement} */ (moreDet.firstChild).textContent = t('grpMore');
+  };
   const levelShown = (/** @type {Control} */ c) => {
     const l = c.level ?? 'expert';
     return l === 'both' || (state.ui === 'normal' ? l === 'normal' : l === 'expert');
   };
   const refreshVisibility = () => {
+    arrange();
+    const normal = state.ui === 'normal';
     for (const w of widgets) {
       w.row.hidden = !levelShown(w.c) || (w.c.visible ? !w.c.visible(state) : false);
       const span = /** @type {HTMLElement} */ (w.row.firstChild);
-      span.textContent = state.ui === 'normal' && span.dataset.normalLabel ? span.dataset.normalLabel : span.dataset.label ?? '';
+      span.textContent = normal ? controlLabel(w.c.key) ?? span.dataset.normalLabel ?? span.dataset.label ?? '' : span.dataset.label ?? '';
+      if (w.c.type === 'select') for (const op of Array.from(/** @type {HTMLSelectElement} */ (w.input).options)) op.textContent = (normal ? optionLabel(w.c.key, op.value) : null) ?? op.dataset.label ?? op.value;
     }
     for (const fs of Object.values(groups)) fs.hidden = !Array.from(fs.querySelectorAll('.ctl')).some((r) => !(/** @type {HTMLElement} */ (r)).hidden);
+    moreDet.hidden = !normal || !Array.from(moreFs.querySelectorAll('.ctl')).some((r) => !(/** @type {HTMLElement} */ (r)).hidden);
   };
   /** show a state value in its widget */
   const sync = (/** @type {string} */ key) => {

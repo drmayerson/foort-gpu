@@ -1,0 +1,89 @@
+{
+ "date": "2026-11-16T14:07:07.579Z",
+ "lang": "en",
+ "extra": "",
+ "report": {
+  "desktop": {
+   "canvas": {
+    "top": 56.140625,
+    "bottom": 610.140625,
+    "left": 230,
+    "right": 784,
+    "h": 554,
+    "w": 554
+   },
+   "caption": {
+    "top": 616.296875,
+    "bottom": 726.453125,
+    "left": 12,
+    "right": 667.484375,
+    "h": 110.15625,
+    "w": 655.484375
+   },
+   "panel": {
+    "top": 56,
+    "bottom": 768,
+    "left": 1014,
+    "right": 1354,
+    "h": 712,
+    "w": 340
+   },
+   "vh": 768,
+   "N": 1024,
+   "pageScroll": 0,
+   "panelScroll": 0,
+   "controls": 20,
+   "errors": [],
+   "labels": [
+    "shadow: light that came too close fell in",
+    "photon ring: light that circled the hole",
+    "brighter: the gas moves towards you here",
+    "dimmer: the gas moves away from you"
+   ],
+   "saturated": {
+    "framesShare": 0,
+    "discShare": 0
+   }
+  },
+  "phone": {
+   "canvas": {
+    "top": 64.40625,
+    "bottom": 423.40625,
+    "left": 8,
+    "right": 367,
+    "h": 359,
+    "w": 359
+   },
+   "caption": {
+    "top": 435.40625,
+    "bottom": 655.71875,
+    "left": 8,
+    "right": 367,
+    "h": 220.3125,
+    "w": 359
+   },
+   "panel": {
+    "top": 697.265625,
+    "bottom": 1343.109375,
+    "left": 8,
+    "right": 367,
+    "h": 645.84375,
+    "w": 359
+   },
+   "vh": 812,
+   "N": 1024,
+   "pageScroll": 526,
+   "panelScroll": 0,
+   "controls": 20,
+   "errors": [],
+   "canvasAfterScroll": {
+    "top": 6,
+    "bottom": 365,
+    "left": 8,
+    "right": 367,
+    "h": 359,
+    "w": 359
+   }
+  }
+ }
+}

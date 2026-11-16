@@ -2,14 +2,18 @@
 // Usage (from dev/): node scripts/runFoort.mjs [caseName ...] [--N 64] [--derivh 1e-5]  (FOORT DerivativeH; output dir <case>_h<derivh>)
 // Output: tools/foort_parity/build/runs/<case>/ (git-ignored): <case>.cfg, <case>_<Diagnostic>.dat, time.json
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CASES, foortConfig } from './foortCases.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const foortDir = process.env.FOORT_DIR ?? resolve(here, '../../../../Coding/FOORT GitHub/FOORT');
-const exe = join(foortDir, 'FOORT', 'bin', process.platform === 'win32' ? 'FOORT.exe' : 'FOORT');
+// FOORT built from the clone's sources by tools/foort_parity/build.sh (2026-11-16: the clone's own FOORT/bin may be older
+// than its sources); FOORT_EXE overrides, and without a build the clone's own executable is used
+const ownBuild = resolve(here, '../../tools/foort_parity/build/foort', process.platform === 'win32' ? 'FOORT.exe' : 'FOORT');
+const exe = process.env.FOORT_EXE ?? (existsSync(ownBuild) ? ownBuild : join(foortDir, 'FOORT', 'bin', process.platform === 'win32' ? 'FOORT.exe' : 'FOORT'));
+console.log(`FOORT executable: ${exe}`);
 const args = process.argv.slice(2);
 const iN = args.indexOf('--N');
 const Nover = iN >= 0 ? Number(args[iN + 1]) : null;

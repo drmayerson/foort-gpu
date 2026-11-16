@@ -3,21 +3,21 @@
  "mode": "parity",
  "pixels": 16384,
  "stride": 1,
- "cpuSeconds": 18.757,
+ "cpuSeconds": 13.877,
  "fourColorAgreement": 1,
  "fourColorMismatches": 0,
  "passesAgreement": 1,
  "passesMismatches": 0,
  "escapeAngle": {
   "median": 5.595381067847857e-7,
-  "p90": 0.000002664517629492654,
+  "p90": 0.000002663267327875554,
   "p99": 0.0000303938835483766,
   "max": 0.0007185799556107206,
   "count": 8352
  },
  "confusion": {
   "escape->escape": 8352,
-  "horizon->horizon": 8032
+  "other->horizon": 8032
  },
  "meanSteps": 660.5526733398438,
  "hEscape": {

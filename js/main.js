@@ -19,6 +19,9 @@ import { drawLightCurve, drawInspector, inspectorTable } from './ui/readouts.js'
 import { snapshotPng, recordVideo, download, videoFormat } from './export.js';
 import { attachInteraction } from './ui/interaction.js';
 import { loadNoiseField, autoNoiseField, noiseCover } from './noise/noiseField.js';
+import { initialLang, setLang, saveLang, getLang, t } from './ui/i18n.js';
+import { captionText, labelSpots, renderLabels, helpRows, fitImage } from './ui/lay.js';
+import { skyImage, skyMode } from './sky.js';
 
 const $ = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const DEG = Math.PI / 180;
@@ -88,7 +91,7 @@ export function viewFromState(s, coarseTables = false, autoTier = 'high') {
 /** review P3: wall-time budget of one drag preview (ms): 30 previews per second */
 const PREVIEW_MS = 33;
 /** the same from the GPU timer queries (ms): the display shares the frame */
-const PREVIEW_GPU_MS = 20;
+const PREVIEW_GPU_MS = 22;   // (2026-11-16: 20 -> 22; 256^2 Kerr takes 19 ms here and flipped to 128^2 on a noisy measurement)
 export const timeFromState = (s, tObs, M) => ({ tObs, slow: !!s.slowLight, M, advect: s.advect ? s.advectD : 0, sigma: s.timeAvg ? 0 : s.sigmaN });
 
 /** @param {Record<string, any>} s @returns {import('./fluid/emission.js').EmissionParams} */
@@ -121,10 +124,13 @@ const store = {
 };
 
 async function main() {
+  // review U2: English or Dutch (shared with the homepage)
+  setLang(initialLang());
   // B7 persistence: the URL takes precedence; without one, the remembered view
   const stored = location.search.length > 1 ? null : store.get();
   const query = new URLSearchParams(stored ?? location.search);
   const state = initialState(query);
+  if (query.has('N') && !query.has('resAuto')) state.resAuto = false;
   // phones (decision E9): a 64 MB record cache and no idle pre-tracing unless the URL asks for it
   const isPhone = navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 820;
   /** review U10: values this device chose for itself (not the user): they stay out of links and the remembered view */
@@ -173,11 +179,19 @@ async function main() {
     const frac = (w.slice(0, i).reduce((a, b) => a + b, 0) + w[i] * (p.total ? p.done / p.total : 0)) / W;
     if (el < 400) return;
     $('progress').hidden = false;
+    $('canvasWrap').classList.add('busy');
     /** @type {HTMLElement} */ ($('progressBar')).style.width = `${(100 * frac).toFixed(1)}%`;
     const eta = frac > 0.02 ? (el * (1 - frac)) / frac / 1000 : NaN;
-    $('progressText').textContent = `${(100 * frac).toFixed(0)}%${Number.isFinite(eta) ? `, about ${eta < 10 ? eta.toFixed(1) : eta.toFixed(0)} s left` : ''}`;
+    $('progressText').textContent = state.ui === 'normal' ? `${t('waiting')} ${(100 * frac).toFixed(0)}%`
+      : `${(100 * frac).toFixed(0)}%${Number.isFinite(eta) ? `, about ${eta < 10 ? eta.toFixed(1) : eta.toFixed(0)} s left` : ''}`;
   };
-  const hideProgress = () => { prog.on = false; $('progress').hidden = true; };
+  const hideProgress = () => { prog.on = false; $('progress').hidden = true; $('canvasWrap').classList.remove('busy'); if (waitTimer) clearTimeout(waitTimer); waitTimer = null; };
+  /** review U8: a wait before the tiles (the device probe, a table bake) is shown on the image after 400 ms too */
+  let waitTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
+  const waitSoon = (/** @type {string} */ key) => {
+    if (waitTimer) clearTimeout(waitTimer);
+    waitTimer = setTimeout(() => { waitTimer = null; $('progress').hidden = false; $('canvasWrap').classList.add('busy'); $('progressText').textContent = t(key); }, 400);
+  };
 
   // noise fields: kept on the GPU by name (compare mode may show two anchors)
   let noise = /** @type {import('./noise/noiseField.js').NoiseField|null} */ (null);
@@ -254,7 +268,10 @@ async function main() {
     noiseCoverage = coverageOf(coarse, em);
     I.sort((a, b) => a - b);
     const top = I.length ? I[Math.min(I.length - 1, Math.floor(0.995 * I.length))] : 0;
-    autoExposure = top > 0 ? 1 / top : 1;
+    // review U4: room for the noise's bright fluctuations, exp(k sigma_n - sigma_n^2 / 2) (k = 1.5: the 93rd percentile
+    // of the lognormal factor), so that the default view is not blown out
+    const sg = sA.sigmaN > 0 ? sA.sigmaN : 0, head = Math.exp(sA.noiseHeadroom * sg - 0.5 * sg * sg);
+    autoExposure = top > 0 ? 1 / (top * Math.max(1, head)) : 1;
   };
   let drawQueued = false;
   const requestDraw = () => {
@@ -290,6 +307,12 @@ async function main() {
   };
   /** camera of the records on screen, for the instant digital zoom and pan while a re-trace runs (B7) */
   let shown = { screen: state.screen, cx: state.cx, cy: state.cy, N: state.N };
+  /** review C7: the simple panel smooths the fuzzball's chaotic interior (single-pixel speckle) with a 0.7-pixel Gaussian
+   * (presentation only; the expert panel shows the raw pixels) @param {Record<string, any>} s */
+  const smoothFuzz = (s) => s.ui === 'normal' && !s.blur && metricEntry(metricIdFromState(s)).mode === 'fuzzball' && !s.bh0;
+  const FUZZ_SMOOTH_PX = 0.7;
+  /** review U3: load a sky picture onto the GPU once, then redraw @param {string} name */
+  const ensureSky = (name) => { if (name !== 'none' && !backend.hasSky(name)) skyImage(name).then((im) => { if (im) { backend.uploadSky(name, im); requestDraw(); } }); };
   /** display parameters of a state @param {Record<string, any>} s @param {{tail:any, M:number}|null} info */
   const displayView = (s, info) => {
     const v = VIEWS[/** @type {keyof typeof VIEWS} */ (s.view)];
@@ -302,10 +325,16 @@ async function main() {
       time: timeFromState(s, tObs, M), tail: info?.tail ?? lastTail, envelope: s.envelope, azimuth: s.az * DEG,
       zoom: { s: shown.screen / s.screen, ox: (s.cx - shown.cx) / pix, oy: (s.cy - shown.cy) / pix },
       // B8: the linear emission for the telescope beam and the light curve
-      post: s.view === 'emission' && (s.blur || s.lightcurve)
-        ? { blurSigmaPx: s.blur ? beamSigmaPx(s.units === 'M' ? s.beamM : s.beamUas, unitsNow(), shown.screen, shown.N) : 0, lightCurve: !!s.lightcurve } : undefined };
+      post: s.view === 'emission' && (s.blur || s.lightcurve || smoothFuzz(s))
+        ? { blurSigmaPx: s.blur ? beamSigmaPx(s.units === 'M' ? s.beamM : s.beamUas, unitsNow(), shown.screen, shown.N) : smoothFuzz(s) ? FUZZ_SMOOTH_PX : 0, lightCurve: !!s.lightcurve } : undefined,
+      // review U3: the background sky. Seen from r, a background at infinity has an Einstein ring of angular radius
+      // sqrt(4M/r) (0.063 rad = 63 M at the hole for r = 1000 M: larger than the field of view), so every ray of the image
+      // is strongly bent. The picture's half-width is twice that angle: one copy fills the weakly lensed outer field, and
+      // the repeated (mirrored) copies close to the shadow are the higher-order images
+      sky: { name: s.sky, mode: backend.hasSky(s.sky) ? skyMode(s.sky) : 0, level: s.skyLevel, half: 2 * Math.sqrt(4 / s.r), camTheta: s.inc * DEG } };
   };
   const draw = () => {
+    canvas.classList.toggle('pixelated', state.view !== 'emission');
     if (state.compare === 'off') {
       backend.canvasSize(state.N, state.N);
       backend.display(displayView(state, null), { side: 'A' });
@@ -336,6 +365,7 @@ async function main() {
   const layoutCompare = () => {
     const on = state.compare !== 'off';
     $('canvasWrap').classList.toggle('side', state.compare === 'side');
+    requestAnimationFrame(() => fit());   // (fit is defined further down; this runs after it)
     $('divider').hidden = state.compare !== 'split';
     /** @type {HTMLElement} */ ($('divider')).style.left = `${100 * state.cmpDiv}%`;
     $('sideLabels').hidden = !on;
@@ -354,7 +384,7 @@ async function main() {
     $('legend').innerHTML = items
       ? items.map(([c, t]) => `<span style="background:${c}"></span>${t}`).join('')
       : 'lo' in v ? `inferno colour map from ${Number.isNaN(state.lo) ? v.lo : state.lo} to ${Number.isNaN(state.hi) ? v.hi : state.hi}`
-        : state.view === 'emission' ? `disc emission Σ F g^${state.redshiftPower} J(r) over all crossings (the first 3 exact, later ones binned); ${['linear', 'sqrt', 'log', 'asinh'][Number(state.toneMap)]} tone map, exposure ${(state.autoExposure ? autoExposure * state.brightness : state.exposure).toPrecision(3)}${lastFluid?.isco ? `; ISCO r = ${lastFluid.isco.toFixed(3)}${lastFluid.M !== 1 ? ` (${(lastFluid.isco / lastFluid.M).toFixed(3)} M)` : ''}` : ''}${metricEntry(metricIdFromState(state)).emissionNote ? `. Note: ${metricEntry(metricIdFromState(state)).emissionNote}` : ''}`
+        : state.view === 'emission' ? `disc emission Σ F g^${state.redshiftPower} J(r) over all crossings (the first 3 exact, later ones binned); ${['linear', 'sqrt', 'log', 'asinh', 'soft-shoulder sqrt'][Number(state.toneMap)]} tone map, exposure ${(state.autoExposure ? autoExposure * state.brightness : state.exposure).toPrecision(3)}${lastFluid?.isco ? `; ISCO r = ${lastFluid.isco.toFixed(3)}${lastFluid.M !== 1 ? ` (${(lastFluid.isco / lastFluid.M).toFixed(3)} M)` : ''}` : ''}${metricEntry(metricIdFromState(state)).emissionNote ? `. Note: ${metricEntry(metricIdFromState(state)).emissionNote}` : ''}`
           : state.view === 'steps' ? `inferno colour map of log(steps), from 1 to max steps (${state.maxSteps})`
             : state.view === 'sky' ? '15° grid in the escape direction (θ, φ), tinted by FOORT quadrant; black: horizon'
               : state.view === 'coverage' ? `Noise coverage: emission-weighted share of the first 3 crossings inside the field's radial range (${noise ? `${noiseName}, r = ${Math.exp(noise.meta.xmin).toPrecision(2)}–${Math.exp(noise.meta.xmax).toPrecision(3)} M` : 'no field'}); green 100%, red 0%, grey: no disc emission. Whole image: ${(100 * noiseCoverage).toFixed(2)}%` : '';
@@ -442,7 +472,7 @@ async function main() {
   /**
    * Review P3: the preview stride. The GPU time of a preview (timer queries; else its wall time, which Chrome quantizes to
    * about a frame while the page draws) is remembered per kind of trace (rate key) and resolution, with the rates, per
-   * GPU. The finest resolution measured within budget wins (GPU time 20 ms: room for the display in a 30 fps frame; wall
+   * GPU. The finest resolution measured within budget wins (GPU time 22 ms: room for the display in a 30 fps frame; wall
    * time 33 ms), and the next finer one is tried once when 4x the measurement is within 1.5x the budget. Unmeasured:
    * 128^2. Full resolution live on a fast GPU.
    */
@@ -505,6 +535,7 @@ async function main() {
       if (s.quality === 'auto' && final && !autoTiers[mode]) {
         if (!autoProbe[mode]) {
           $('status').textContent = 'measuring this device (quality auto)…';
+          if (final) waitSoon('waitingFirst');
           await probeTier(mode, s);
           if (id !== runId) return null;
         }
@@ -540,7 +571,7 @@ async function main() {
       const ts = tableSpec(view);
       let tables;
       if (ts) {
-        if (!bakes.cache.has(ts.key)) $('status').textContent = 'baking metric tables…';
+        if (!bakes.cache.has(ts.key)) { $('status').textContent = 'baking metric tables…'; if (final) waitSoon('waiting'); }
         const bk = await bakes.get(ts);
         if (id !== runId) return null;   // superseded while baking
         tables = bk.tables;
@@ -636,6 +667,7 @@ async function main() {
     if (final && state.pretrace && state.compare === 'off') schedulePretrace(id);
     if (st) lastStats = st;
     if (final) { legend(); $('clock').textContent = clockText(); }
+    if (final) { lastFailed = false; updateCaption(); updateLabels(); }
     requestDraw();
     if (!st) return;
     const notes = [...clamped, ...(cameraNote ? [cameraNote] : []), ...(res?.setup.warnings ?? [])];
@@ -649,7 +681,7 @@ async function main() {
       nanShare = nNan / n;
     }
     $('status').textContent = (final
-      ? nanShare > 0.5 ? `failed: ${(100 * nanShare).toFixed(0)}% of the rays ended in NaN (${st.N}², ${q})` : `done: ${st.N}², ${st.wallMs.toFixed(0)} ms, ${q}${state.compare !== 'off' ? ', compare A | B' : ''}`
+      ? nanShare > 0.5 ? (lastFailed = true, updateCaption(), `failed: ${(100 * nanShare).toFixed(0)}% of the rays ended in NaN (${st.N}², ${q})`) : `done: ${st.N}², ${st.wallMs.toFixed(0)} ms, ${q}${state.compare !== 'off' ? ', compare A | B' : ''}`
       : `preview (stride ${res?.levels?.[0] ?? '?'}, draft); release to refine`) + note;
     if (final) finals++;
     if (final && res) showPerf(st, res.setup.warnings, res.setup.tables ? lastBake : res.setup.program.startsWith('trace_kerr_analytic') ? 'none: hand-written closed-form Kerr shader' : `none: generated closed-form shader (${res.setup.program.slice(7).split('+')[0]})`);
@@ -693,8 +725,31 @@ async function main() {
   const noiseArrived = () => { updateExposure(); $('clock').textContent = clockText(); legend(); requestDraw(); };
   const refreshNoise = () => useNoise(wantedNoise()).then(noiseArrived);
   const applyPanel = () => {
-    $('uiToggle').textContent = state.ui === 'normal' ? 'Expert panel' : 'Normal panel';
-    $('perfBox').hidden = state.ui === 'normal';
+    const normal = state.ui === 'normal';
+    $('uiToggle').textContent = normal ? t('expertPanel') : t('normalPanel');
+    $('perfBox').hidden = normal;
+    // review U1: the simple panel shows a plain caption; status, clock and legend belong to the expert panel
+    for (const id of ['status', 'clock', 'legend']) $(id).hidden = normal;
+    $('caption').hidden = $('presets').hidden = !normal;
+    $('explain').parentElement.hidden = !normal;
+    if (!normal) { explainOn = false; $('labels').hidden = true; }
+    updateCaption();
+  };
+  /** review U1/U2: every fixed text of the page in the current language */
+  const applyTexts = () => {
+    const L = getLang();
+    for (const b of Array.from(document.querySelectorAll('.langs button'))) b.setAttribute('aria-pressed', String(/** @type {HTMLElement} */ (b).dataset.set === L));
+    $('tagline').textContent = t('tagline');
+    $('fullscreen').textContent = t('fullscreen'); $('snapshot').textContent = t('snapshot');
+    $('hidePanel').textContent = $('layout').classList.contains('nopanel') ? t('showPanel') : t('hidePanel');
+    $('record').textContent = t('record');
+    $('resetView').textContent = t('reset'); $('menuLabel').textContent = t('more'); $('guideLink').textContent = t('guide');
+    $('helpTitle').textContent = t('helpTitle'); $('helpClose').textContent = t('close'); $('helpTable').innerHTML = helpRows();
+    $('explain').textContent = explainOn ? t('explainHide') : t('explain');
+    buildPresets();
+    applyPanel();
+    controls.refresh();
+    if (explainOn) updateLabels();
   };
   /** swap the side the panel edits (expert compare): the other side's own settings come out of the stash */
   const swapEditedSide = () => {
@@ -704,7 +759,8 @@ async function main() {
     controls.refresh();
   };
   let editedSide = state.cmpEdit;
-  const controls = buildControls(/** @type {HTMLFormElement} */ ($('controls')), state, (key, final, retrace) => {
+  /** @param {string} key @param {boolean} final @param {boolean} retrace */
+  const onControl = (key, final, retrace) => {
     if (key === 'view') { controls.set('lo', NaN); controls.set('hi', NaN); legend(); }
     if (key === 'family') {
       // normal panel: black hole = Kerr, fuzzball = ST3Cr
@@ -749,15 +805,99 @@ async function main() {
     if (['slowLight', 'play', 'timeAvg'].includes(key)) $('clock').textContent = clockText();
     if (key === 'noiseField' || key === 'metric' || key === 'lambda' || key === 'bh0') refreshNoise();
     if (state.compare !== 'off') layoutCompare();
+    if (key === 'sky') ensureSky(state.sky);
+    if (key === 'N') controls.set('resAuto', false);
+    if (key === 'resAuto' && state.resAuto) { fit(); return; }
+    if (['sky', 'timeAvg', 'play', 'lambda', 'a', 'inc', 'bh0', 'sigmaN'].includes(key)) updateCaption();
+    if (key === 'sigmaN' || key === 'noiseHeadroom') { updateExposure(); legend(); }
     const isParam = !!CONTROLS.find((c) => c.key === key)?.metricParam;
     if (retrace) run(final, isParam && !final); else { saveUrlSoon(); legend(); requestDraw(); }
+  };
+  const controls = buildControls(/** @type {HTMLFormElement} */ ($('controls')), state, onControl);
+  // review U7: quick views of the simple panel
+  const PRESETS = [
+    ['pFaceOn', { inc: 5 }], ['pEdgeOn', { inc: 85 }], ['pNoSpin', { family: 'bh', a: 0 }], ['pFastSpin', { family: 'bh', a: 0.99 }],
+    ['pCompare', { family: 'bh', compare: 'side' }],
+  ];
+  const buildPresets = () => {
+    const el = $('presets');
+    el.innerHTML = `<span class="label">${t('presets')}</span>`;
+    for (const [key, set] of /** @type {[string, Record<string, any>][]} */ (PRESETS)) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'secondary'; b.textContent = t(key); b.dataset.preset = key;
+      b.addEventListener('click', () => applyPreset(set));
+      el.appendChild(b);
+    }
+  };
+  /** @param {Record<string, any>} set */
+  const applyPreset = (set) => {
+    for (const [k, v] of Object.entries(set)) if (k !== 'family' && k !== 'compare') controls.set(k, v);
+    if ('family' in set && set.family !== state.family) {
+      controls.set('family', set.family);
+      controls.set('metric', set.family === 'bh' ? 'kerr' : 'st3cr');
+      controls.set('maxSteps', MAX_STEPS_DEFAULT[metricEntry(metricIdFromState(state)).mode]);
+      refreshNoise();
+    }
+    updateCaption();
+    if ('compare' in set && set.compare !== state.compare) { controls.set('compare', set.compare); onControl('compare', true, true); return; }
+    if (state.compare !== 'off') layoutCompare();
+    run(true);
+  };
+  // review U1: the caption and the explanation labels
+  let lastFailed = false, explainOn = false;
+  const updateCaption = () => {
+    const s = sideState('A'), id = metricIdFromState(s);
+    const kind = { fuzzball: metricEntry(id).mode === 'fuzzball' || id === 'st3crBH', bh0: id !== 'st3cr' && metricEntry(id).mode !== 'BH' || !!s.bh0 };
+    const other = state.compare !== 'off' ? (metricEntry(metricIdFromState(sideState('B'))).mode === 'fuzzball' ? t('cmpFb') : t('cmpBh')) : undefined;
+    $('caption').textContent = lastFailed ? t('failed') : captionText(s, { fuzzball: kind.fuzzball, bh0: !!s.bh0 }, other);
+  };
+  const updateLabels = () => {
+    $('labels').hidden = !explainOn || state.compare !== 'off';
+    if (!explainOn || state.compare !== 'off' || !coarse) return;
+    const n = coarse.length / RECORD_FLOATS, w = Math.round(Math.sqrt(n)), h = Math.round(n / w);
+    const sA = sideState('A'), em = emissionFromState(sA), I = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      const d = decodeRecord(coarse, k, lastTail ?? undefined);
+      I[k] = discIntensity(sA.storeH ? d.crossings.slice(0, 2) : d.crossings, em, d.tail);
+    }
+    renderLabels($('labels'), labelSpots(coarse, w, h, I, { fuzzball: metricEntry(metricIdFromState(sA)).mode === 'fuzzball' && !sA.bh0, inc: sA.inc }));
+  };
+  $('explain').addEventListener('click', () => {
+    explainOn = !explainOn;
+    $('explain').setAttribute('aria-pressed', String(explainOn));
+    $('explain').textContent = explainOn ? t('explainHide') : t('explain');
+    updateLabels();
   });
-  applyPanel();
+  // review U2: the language switch
+  for (const b of Array.from(document.querySelectorAll('.langs button'))) b.addEventListener('click', () => {
+    const l = /** @type {'en'|'nl'} */ (/** @type {HTMLElement} */ (b).dataset.set);
+    setLang(l); saveLang(l); applyTexts();
+  });
+  // review U5/U6/U9: fit the image into the window; with resAuto, the resolution follows its size on screen
+  let fitTimer = /** @type {ReturnType<typeof setTimeout>|null} */ (null);
+  const fit = () => {
+    const perView = fitImage($('stage'), $('canvasWrap'), state.compare === 'side' ? 2 : 1);
+    if (!state.resAuto) return;
+    const px = perView * (window.devicePixelRatio || 1);
+    let n = [256, 512, 1024].find((c) => c >= 0.85 * px) ?? 1024;
+    const mode = metricEntry(metricIdFromState(state)).mode;
+    while (n > 256) { const p = predictS({ ...state, N: n }); if (p === null || p <= TIER_TARGET_S[mode]) break; n /= 2; }
+    if (n === state.N) return;
+    controls.set('N', n);
+    deviceDefaults.N = n;
+    if (fitTimer) clearTimeout(fitTimer);
+    fitTimer = setTimeout(() => { fitTimer = null; if (finals > 0) run(true); }, 400);
+  };
+  new ResizeObserver(() => fit()).observe($('stage'));
+  window.addEventListener('resize', fit);
+  applyTexts();
   layoutCompare();
+  fit();
+  ensureSky(state.sky);
 
   // toolbar (B7)
   const togglePanelMode = () => { controls.set('ui', state.ui === 'normal' ? 'expert' : 'normal'); controls.refresh(); applyPanel(); layoutCompare(); saveUrlSoon(); requestDraw(); };
-  const toggleHide = () => { const l = $('layout'); l.classList.toggle('nopanel'); $('hidePanel').textContent = l.classList.contains('nopanel') ? 'Show panel' : 'Hide panel'; };
+  const toggleHide = () => { const l = $('layout'); l.classList.toggle('nopanel'); $('hidePanel').textContent = l.classList.contains('nopanel') ? t('showPanel') : t('hidePanel'); fit(); };
   const toggleFullscreen = () => { if (document.fullscreenElement) document.exitFullscreen(); else $('stage').requestFullscreen?.().catch(() => {}); };
   // B9 export: a PNG at trace resolution with the view's link inside (tEXt "foort-gpu-url"), optionally with the scale
   // bar and the clock burned in
@@ -805,11 +945,13 @@ async function main() {
       else $('status').textContent = 'recording cancelled';
     } catch (e) { $('status').textContent = `recording failed: ${String(/** @type {Error} */ (e).message)}`; }
     recording = false;
-    $('record').textContent = 'Record video';
+    $('record').textContent = t('record');
     $('progress').hidden = true;
     tObs = t0; draw(); $('clock').textContent = clockText();
   };
   const toggleHelp = (/** @type {boolean|undefined} */ force = undefined) => { $('helpOverlay').hidden = force === undefined ? !$('helpOverlay').hidden : !force; };
+  // the toolbar's "More" menu closes after a choice
+  for (const el of Array.from($('menu').querySelectorAll('button'))) el.addEventListener('click', () => { /** @type {HTMLDetailsElement} */ ($('menu')).open = false; });
   $('uiToggle').addEventListener('click', togglePanelMode);
   $('hidePanel').addEventListener('click', toggleHide);
   $('fullscreen').addEventListener('click', toggleFullscreen);

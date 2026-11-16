@@ -75,6 +75,8 @@ export async function createWebGL2Backend(canvas, opts = {}) {
   const tracePrograms = new Map();
   /** B7: noise fields by name, and fluid-table textures by key (compare mode draws two views per frame) */
   const noiseSet = /** @type {Map<string, {tex: WebGLTexture, meta: any}>} */ (new Map());
+  /** review U3: background sky pictures by name (texture unit 14 of the display pass) */
+  const skySet = /** @type {Map<string, {tex: WebGLTexture, aspect: number}>} */ (new Map());
   const fluidSet = /** @type {Map<string, {tex: WebGLTexture, grid: any}>} */ (new Map());
   /** @param {import('../fluid/fluidTable.js').FluidTable} F @param {string} key */
   const fluidFor = (F, key) => {
@@ -590,6 +592,23 @@ void main() {
 
     clearCanvas() { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, canvas.width, canvas.height); gl.clearColor(0.08, 0.08, 0.1, 1); gl.clear(gl.COLOR_BUFFER_BIT); },
 
+    uploadSky(name, img) {
+      if (skySet.has(name)) return;
+      const tex = /** @type {WebGLTexture} */ (gl.createTexture());
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, img);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+      const w = /** @type {any} */ (img).naturalWidth ?? /** @type {any} */ (img).width, h = /** @type {any} */ (img).naturalHeight ?? /** @type {any} */ (img).height;
+      skySet.set(name, { tex, aspect: w / h });
+    },
+    hasSky: (name) => skySet.has(name),
+
     uploadNoise(F, name = '') {
       const m = F.meta;
       // B7: fields stay loaded by name (compare mode can show two anchors); the current one is the last uploaded
@@ -872,8 +891,26 @@ void main() {
       gl.uniform4f(display.loc('uEm'), em.mu, em.gamma, em.sigma, em.redshiftPower);
       gl.uniform4f(display.loc('uEm2'), em.fudge, em.maxPasses, view.exposure ?? 1, view.toneMap ?? 0);
       gl.uniform4i(display.loc('uEm3'), view.colorMap ?? 0, view.envelope === 'circumferential' ? 1 : 0, 0, 0);
+      // review U3: the background sky (unit 14; none: mode 0 with any 2D texture bound)
+      const sk = view.sky && view.sky.mode > 0 && view.mode === 8 ? skySet.get(view.sky.name) : undefined;
+      gl.activeTexture(gl.TEXTURE0 + 14);
+      gl.bindTexture(gl.TEXTURE_2D, sk ? sk.tex : fl.tex);
+      gl.uniform1i(display.loc('uSky'), 14);
+      gl.uniform4f(display.loc('uSkyP'), sk && view.sky ? view.sky.mode : 0, view.sky?.level ?? 0, view.sky?.half ?? 1, sk ? sk.aspect : 1);
+      const ct = view.sky?.camTheta ?? Math.PI / 2;
+      gl.uniform4f(display.loc('uSkyCam'), Math.sin(ct), Math.cos(ct), 0, 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       gl.disable(gl.SCISSOR_TEST);
+      // with post passes the sky is drawn into the canvas first, and the blurred disc is blended over it (P_TONE)
+      if (lin && sk) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(vp[0], vp[1], vp[2], vp[3]);
+        if (src.scissor) { gl.enable(gl.SCISSOR_TEST); gl.scissor(src.scissor[0], src.scissor[1], src.scissor[2], src.scissor[3]); }
+        gl.uniform4i(display.loc('uOrigin'), vp[0], vp[1], 0, 0);
+        gl.uniform4i(display.loc('uOut'), 2, 0, 0, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        gl.disable(gl.SCISSOR_TEST);
+      }
       if (lin && view.post) {
         // light curve: 2x2 sums down to one texel, read back asynchronously (finished values: pollLightCurve)
         if (view.post.lightCurve) {
@@ -916,7 +953,9 @@ void main() {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(vp[0], vp[1], vp[2], vp[3]);
         if (src.scissor) { gl.enable(gl.SCISSOR_TEST); gl.scissor(src.scissor[0], src.scissor[1], src.scissor[2], src.scissor[3]); }
-        postPass(3, img, null, { k: [k], tone: [view.exposure ?? 1, view.toneMap ?? 0, view.colorMap ?? 0, 0], origin: [vp[0], vp[1], 0, 0], full: [RW, RH, 0, 0] });
+        if (sk) { gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
+        postPass(3, img, null, { k: [k], tone: [view.exposure ?? 1, view.toneMap ?? 0, view.colorMap ?? 0, sk ? 1 : 0], origin: [vp[0], vp[1], 0, 0], full: [RW, RH, 0, 0] });
+        gl.disable(gl.BLEND);
         gl.disable(gl.SCISSOR_TEST);
       }
       lastDisplayMs = performance.now() - t0;

@@ -1,0 +1,36 @@
+{
+ "label": "after78",
+ "metric": "kerr",
+ "date": "2026-11-16T14:25:44.579Z",
+ "rows": [
+  {
+   "pass": "warm-up",
+   "previews": 109,
+   "seconds": 3.0145,
+   "lastStride": 2,
+   "lastMs": 0.5999999940395355,
+   "gpuMedian": 18.92032,
+   "N": 512,
+   "strideFrames": {
+    "2": 108,
+    "4": 2
+   },
+   "fps": 36.158566926521814,
+   "previewRes": 256
+  },
+  {
+   "pass": "measured",
+   "previews": 116,
+   "seconds": 3.0226999999880793,
+   "lastStride": 2,
+   "lastMs": 0.4000000059604645,
+   "gpuMedian": 18.88244,
+   "N": 512,
+   "strideFrames": {
+    "2": 118
+   },
+   "fps": 38.37628610198084,
+   "previewRes": 256
+  }
+ ]
+}

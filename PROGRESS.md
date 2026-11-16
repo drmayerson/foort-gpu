@@ -1690,3 +1690,54 @@ The viewer's final traces of the default Kerr view, median of 5 (`dev/scripts/r2
 
 - A full check of the port against FOORT v1.0.0 (user, 2026-11-16). FOORT changed much more since the port's parity runs: the adaptive step, the camera vielbein, RLogScale on by default, metric parameter checks, NaN termination, the mesh and the flat-space metric.
 - Packages 7-8 wait on the user.
+
+## FOORT v1.0.0 physics check and review packages 7-8 (2026-11-16)
+
+### Physics against FOORT v1.0.0
+
+FOORT built from v1.0.0's sources (`sh tools/foort_parity/build.sh`). All M2 parity cases were re-run at 128² (`runFoort.mjs`, `runCpuRef.mjs`, `compareFoort.mjs --mode parity`, `m5GpuVsFoort.mjs`, `m6GpuVsFoort.mjs`, `metricParity.mjs`, `fluidParity.mjs`):
+
+| check | result against v1.0.0 | before (FOORT cfff2d5) |
+|---|---|---|
+| metrics, g_dd and g_uu (16 cases) | ≤ 5e-14 after scaling; golden values identical | same |
+| CPU reference vs FOORT, black holes | four-colour 100% (Manko–Novikov 99.994%, 1 px); escape directions median 5e-7 | same |
+| GPU vs FOORT intensities, black holes | relative L1 4.1e-3 to 7.2e-3 | same to 3-4 digits (Manko–Novikov 0.4556% → 0.4572%) |
+| GPU vs FOORT, fuzzball (chaotic) | four-colour 92.41%; on pixels with ≤ 3 passes, same class: L1 7.4e-4 | 92.47%; 7.4e-4 |
+| CPU vs FOORT, fuzzball | four-colour 94.3% (all pixels) | 94.7% (every second pixel) |
+| fluid (package 6) | ISCO ≤ 3e-6 (Manko–Novikov 0.94/2: 7e-5, FOORT's nested differences); u_μ ≤ 5e-6 away from the ISCO | — |
+
+- **Fuzzball intensity L1:** it changed from 1.03 to 1.48 because of one more hot pixel in FOORT, a single chaotic ray.
+- **"other" shadow rays for a = 0:** FOORT now records the last point of a shadow ray just outside the script's horizon threshold, so `compareFoort` calls 6058 of them "other" instead of "horizon". The same 6060 rays end without escaping; this is a labelling change in the script, not physics.
+
+### Packages 7-8
+
+`node dev/scripts/r78Shots.mjs [--lang nl] [--q …]` (screenshots in the git-ignored `dev/reports/img/review/`, numbers in `dev/reports/review/r78_*.json`) and `dev/tests/e2e/review78.spec.js`:
+
+| the review's target | result |
+|---|---|
+| simple panel: no status, clock or legend jargon | hidden; a caption per spacetime instead (EN and NL) |
+| sky on by default, the azimuth drag moves it | Deep Field by default; "walk around" changes the image with no re-trace |
+| default view under 1% saturated pixels over one noise period | 0% (32 frames) |
+| about eight controls plus presets | 9 rows in "What you see", 5 quick views, the rest under "More settings" |
+| 1366×768: image and caption visible without scrolling, the panel scrolls on its own | image 56–610 px, caption to 726 px, no page scroll |
+| 375×812: the image visible while a slider moves | pinned: top 6 px after scrolling to the end of the panel |
+
+- **Also in these packages:**
+  - the labels ("What am I looking at?");
+  - waiting shown on the dimmed image;
+  - the fuzzball smoothed in the simple panel;
+  - the resolution from the screen (1024² at 1366×768 with pixel ratio 1.5);
+  - smooth scaling;
+  - a favicon.
+- **Drag previews:** 38/s at 256² (unchanged).
+
+### Tests
+
+- Vitest 165 and Playwright 58 (new: `review78.spec.js`, 7 tests), in two clean runs; tsc clean.
+- Two tests now open the toolbar's "More" menu, where "Record video" and "Reset to defaults" moved.
+
+### For the user
+
+- **To review and edit:** the captions and labels (`js/ui/i18n.js`).
+- **To judge:** the sky with the disc on top. Suggested views: field of view 60–200 M, viewing angle 75°, the Pillars or the Deep Field.
+- **The site repository (not changed here):** the homepage's Dutch card for FOORT-GPU says the viewer is in English ("in het Engels"). Its simple panel is now Dutch too.

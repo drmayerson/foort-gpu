@@ -21,11 +21,14 @@ uniform vec4 uCamAz;    // camera azimuth (rad), 0, 0, 0 (Stage 1B B5: display-o
 uniform highp sampler2D uFluidD;  // fluid table (1/u^t, u^r/u^t, Omega) (js/fluid/fluidTable.js), for advection
 uniform vec4 uFluidXD;  // xMin, dx, nodes, r0 of the fluid table
 uniform ivec4 uView;    // view mode, Nx, Ny, |H| stored in slot 3
+uniform highp sampler2D uSky;  // review U3: the background sky (js/sky.js), RGBA8, linear, repeat
+uniform vec4 uSkyP;     // sky mode (0 none, 1 equirectangular in (theta, phi), 2 a picture behind the hole), brightness, picture half-width (rad), picture aspect w/h
+uniform vec4 uSkyCam;   // sin, cos of the camera's theta (the picture's frame: right = (0, 1, 0), up = (-cos, 0, sin) in (x, y, z))
 uniform ivec4 uOrigin;  // Stage 1B B7: lower-left canvas pixel of this view (compare side by side), 0, 0
 uniform vec4 uZoom;     // B7 instant digital zoom while a re-trace runs: scale (> 1 zooms in), offset x, y (record pixels), 0
 uniform vec4 uRange;    // view range lo, hi; max steps; r_cam
 uniform vec4 uEm;       // Johnson-SU mu, gamma, sigma; redshift power
-uniform vec4 uEm2;      // fudge factor, max passes (0: no bound), exposure, tone map (0 linear, 1 sqrt, 2 log, 3 asinh)
+uniform vec4 uEm2;      // fudge factor, max passes (0: no bound), exposure, tone map (0 linear, 1 sqrt, 2 log, 3 asinh, 4 soft shoulder)
 uniform ivec4 uEm3;     // colour map (0 afmhot, 1 inferno, 2 grey), envelope radius (0 coordinate r, 1 circumferential, B3), 0, 0
 uniform ivec4 uOut;     // Stage 1B B8: x = 1 writes the disc emission linearly (before exposure) for the post passes (telescope
                         // blur, light curve, tone map in post.glsl): (total, image n = 1, n = 2, n >= 3 + tail)
@@ -162,6 +165,23 @@ float tailEmission(int l, ivec2 q) {
   return tailBin(a.x, 0) + tailBin(a.y, 1) + tailBin(a.z, 2) + tailBin(a.w, 3) + tailBin(c.x, 4) + tailBin(c.y, 5) + tailBin(c.z, 6) + tailBin(c.w, 7);
 }
 
+// review U3: the background sky in the escape direction (theta, phi + azimuth) of a ray. A picture hangs behind the hole
+// (seen from the camera's frame) and continues mirrored beyond its edges, also for light from behind the camera.
+vec3 skyColor(float th, float ph) {
+  if (uSkyP.x < 0.5) return vec3(0.0);
+  if (uSkyP.x < 1.5) return texture(uSky, vec2(ph / (2.0 * PI), 1.0 - th / PI)).rgb;
+  float st = sin(th);
+  vec3 d = vec3(st * cos(ph), st * sin(ph), cos(th));
+  vec2 n = vec2(d.y, -uSkyCam.y * d.x + uSkyCam.x * d.z);
+  vec2 uv = 0.5 + vec2(n.x, n.y * uSkyP.w) / (2.0 * uSkyP.z);
+  uv = 1.0 - abs(mod(uv, 2.0) - 1.0);
+  return texture(uSky, uv).rgb;
+}
+// review U4: sqrt with a soft shoulder above 0.7 (slope 1 there, approaching 1): no flat white
+float softShoulder(float v) {
+  float s = sqrt(v);
+  return s < 0.7 ? s : 0.7 + 0.3 * (1.0 - exp(-(s - 0.7) / 0.3));
+}
 void main() {
   // record pixel of this canvas pixel: the view's origin, then the digital zoom about the image centre
   vec2 c0 = 0.5 * vec2(uView.yz);
@@ -216,12 +236,18 @@ void main() {
     float I3 = (uView.w == 1 ? 0.0 : passEmission(rec3(lv, q), 2)) + tailEmission(lv, q);
     float I = I1 + I2 + I3;
     if (uOut.x == 1) { color = vec4(I, I1, I2, I3); return; }
+    vec3 sky = code == 2 ? uSkyP.y * skyColor(th, ph) : vec3(0.0);
+    // the sky under the blurred disc (the post pass blends the disc over it)
+    if (uOut.x == 2) { color = vec4(sky, 1.0); return; }
     float v = max(I * uEm2.z, 0.0);
     int tm = int(uEm2.w + 0.5);
     if (tm == 1) v = sqrt(v);
     else if (tm == 2) v = log(1.0 + 99.0 * v) / log(100.0);
     else if (tm == 3) v = asinh(30.0 * v) / asinh(30.0);
+    else if (tm == 4) v = softShoulder(v);
     c = uEm3.x == 0 ? afmhot(v) : uEm3.x == 1 ? inferno(v) : vec3(clamp(v, 0.0, 1.0));
+    // the (optically thin) disc over the sky: the sky shows where the disc is faint
+    c += sky * (1.0 - clamp(v, 0.0, 1.0));
   } else if (mode == V_NOISE) {
     // the noise X at crossing 1 (as sampled for the emission), grey = 0.5 + X / 8 (tests read it back)
     vec4 c1 = rec1(lv, q);

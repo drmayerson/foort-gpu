@@ -479,3 +479,63 @@ non-trivial implementation choice.
 - 2026-11-16 — **Two test races fixed** (seen under parallel load, unrelated to C6):
   - **m4 metric switching:** it waited for a "done" still on screen from the previous metric; it now waits for the next finished trace.
   - **B7 blink:** the first `b` press stops the blinking, and the side it shows depends on when the last blink flipped; the flip is now checked on a second press.
+
+## Packages 7-8 and the FOORT v1.0.0 check: the user's decisions (2026-11-16)
+
+User, verbatim where quoted:
+- **Physics check against FOORT v1.0.0:** "what is important to double-check is especially the physics itself (like the ISCO stuff). Things like adaptive step size are not themselves a true physics issue, but rather about precision and speed - and there, I want to emphasize that it can be OK to trade off some precision for more speed: in the end, FOORT-GPU is NOT primarily made for research purposes but rather for outreach. (However, any such choice of speed over precision should be well documented of course.)"
+- **U2, language:** an EN/NL switch, the same as the homepage's.
+- **P2, tier policy:** keep the highest tier that fits the time target (E1 stands) "for now".
+- **U3, azimuth:** implement a lensed background sky and check how it looks with the emission on top. Use the pictures of the `bh-camera` repository.
+- **U4, default look:** changing the default view is OK for now.
+- **U7, controls:** about eight normal-panel controls plus presets, the rest behind "More": OK for now.
+- **U1, captions:** "draft a wording and I can change later".
+- **C7, fuzzball speckle:** the coder's recommendation.
+- **U6, resolution:** N from the on-screen size (up to 1024) when the predicted time allows: yes.
+- **U9, phone:** the image pinned at the top.
+- **E7, physics options:** not now. Kept as possible extensions: a retrograde disc, inner and outer disc radii, and a zero-angular-momentum camera ("something for a next stage - where we fly around in a spaceship").
+- **The review document:** in this repository's `private/` folder, git-ignored (never published).
+
+### FOORT v1.0.0 physics check (2026-11-16)
+
+- **Scope (user):** the physics of the port against FOORT v1.0.0 (37e16c7; sources equal to the local clone, 588d9ef), not precision or speed. Every FOORT source change since the port's last parity runs (cfff2d5, 3 Nov) was read:
+  - **Physics changes:** the ISCO search and the inside-ISCO rule (ported in package 6) are the only ones.
+  - **Pole fold:** FourColorScreen now folds θ back into [0, π]. The port's θ never leaves (0, π) (measured with a camera 3° from the axis), so FOORT now agrees with the port; nothing to port.
+  - **Termination:** NaN termination also catches infinities, and the time-out triggers one step earlier. These are bookkeeping; the port's NaN code tests NaN and Inf already.
+  - **Configuration:** RLogScale is on by default (the parity configs set it explicitly). There are parameter checks: Kerr |a| ≤ 1, and the Johannsen limits α₁₃, ε₃ > −r₊³ and α₂₂, α₅₂ > −r₊², which the port's `validate` already enforces. ST3Cr with P³ ≥ q₀ is now allowed, with a warning.
+  - **No changes:** the metric formulas, the camera (ViewScreen, the vielbein), the integrator and the emission profile.
+- **Harness:** `tools/foort_parity/build.sh` also builds FOORT itself from the clone's sources, into `tools/foort_parity/build/foort/` (-O3, OpenMP, git-ignored). `runFoort.mjs` uses it: the clone's own `FOORT/bin/FOORT.exe` (5 Nov) was older than its sources. FOORT_EXE overrides.
+- **Speed over precision (user):** acceptable when documented. No new trade was made in this check.
+
+### Packages 7-8 (2026-11-16): implementation choices
+
+- **Simple panel (U7):** the main group has the object, spin or λ, viewing angle, field of view, "walk around" (azimuth), background, play, calm disc and compare (9 visible rows); everything else is under "More settings" (`NORMAL_MAIN`, `NORMAL_MORE` in `controls.js`). The λ = 0 checkbox is expert only (the slider's lowest position sets it). The quick views are face-on (5°), edge-on (85°), not spinning, fast spin (a = 0.99), and fuzzball next to black hole (side by side).
+- **Captions (U1):** drafts in `i18n.js` (`capKerr`, `capFb`, `capFbBh`, `capCompare`, for the user to edit). They name the spin and viewing angle in words and credit the background picture. In the simple panel the status line, clock and legend are hidden (the expert panel keeps them); a failed trace shows a plain sentence instead.
+- **Labels (U1):** "What am I looking at?" places labels from the coarse records of the last trace:
+  - the shadow (centroid of the horizon pixels) and the photon ring (just above the shadow);
+  - the brighter and dimmer sides (intensity-weighted centres of the two halves, when they differ by more than 30%);
+  - for views more than 25° from the axis, the lensed far side of the disc (the brightest pixel above the ring);
+  - for the fuzzball, "no shadow" at the centre.
+
+  The boxes sit in fixed slots near the image edges, so they never overlap.
+- **Language (U2):** English and Dutch for the simple panel, the toolbar, the presets, the captions, the labels, the waiting text and the help. The expert panel stays English. The choice is stored under the homepage's localStorage key `home-lang` (same origin), with `?lang=` overriding it.
+- **Background sky (U3):**
+  - **Pictures:** the five pictures of the `bh-camera` repository (`sky/`, NASA and ESA, credited in the caption), plus a generated star field (after the BH camera's star sky, as a flat 2048² tile). The default is the Hubble Ultra Deep Field at brightness 0.6.
+  - **Mapping:** display only. Each escaped ray's final direction, in the camera's frame (right = +y, up = −e_θ; measured from the records), picks the point in the picture, which continues mirrored beyond its edges as in the BH camera; "walk around" turns it.
+  - **Size:** a background at infinity has an Einstein ring of √(4M/r) = 0.063 rad seen from 1000 M (63 M at the hole, larger than the field of view), so every ray of the image is strongly bent. A picture sized to the field of view repeated many times. Its half-width is now 2 √(4M/r): one copy fills the weakly lensed outer field, and the copies near the shadow are the higher-order images.
+  - **Equirectangular rejected:** at the default field of view (0.9°) it would put about 5 texels across the image.
+  - **Over the disc:** the disc is drawn over the sky as disc + sky × (1 − v), v the disc's tone-mapped brightness. With post passes (beam, light curve), a sky pass draws first and the tone-map pass blends over it with the same formula.
+  - **Check with the user:** whether it looks good with the emission on top (user: "implement and check").
+- **Default look (U4):** the auto exposure is divided by exp(k σₙ − σₙ²/2), with k = 1.5 (the lognormal factor's 93rd percentile; `noiseHeadroom` in the expert panel). The tone map is now sqrt with a soft shoulder above 0.7 (`toneMap` 4, the new default; asymptote 1, no flat white), and σₙ = 0.6 by default (was 1). The default view has 0 saturated pixels over one noise period (target < 1%); before, its lower-left third was flat white.
+- **Waiting (U8):** the progress box sits on the image, which is dimmed, after 400 ms. That also covers the device probe and table bakes, which before showed only as status text.
+- **Fuzzball speckle (C7, the coder's choice as asked):**
+  - **Chosen:** in the simple panel, a 0.7-pixel Gaussian smooths the fuzzball's chaotic interior. It costs nothing (the existing post pass) and is presentation only; the expert panel shows the raw pixels.
+  - **Rejected:** 2×2 supersampling, which would cost 4× the fuzzball's trace time (1.5 s → about 6 s at 512² here).
+- **Layout (U5, U9):**
+  - **Desktop:** an app shell with a one-line header (language switch; snapshot, fullscreen, help and the "More" menu with hide panel, record, reset and links). The image fills the space left of a 340 px panel that scrolls on its own, with the caption under the image.
+  - **Narrow windows (≤ 820 px):** one column, the image pinned at the top (at most 55% of the window height) while the page scrolls under it.
+  - **Also:** a favicon and a meta description (U10).
+- **Resolution (U6):**
+  - **Choice:** `resAuto` (on by default) takes the smallest of 256², 512², 1024² that is at least 85% of the image's device pixels, halved while the predicted trace exceeds the tier's time target. It re-traces after a resize. A link with N, or setting N in the expert panel, turns it off, and the chosen N stays out of links (U10).
+  - **Scaling:** smooth in the emission view, pixelated in the debug views.
+- **Drag previews:** the GPU budget is now 22 ms (was 20). 256² Kerr takes 19 ms here and fell back to 128² on a noisy measurement. 38 previews/s at 256².

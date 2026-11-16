@@ -1,0 +1,88 @@
+{
+ "date": "2026-11-16T14:11:50.151Z",
+ "lang": "nl",
+ "extra": "family=fuzzball&metric=st3cr",
+ "report": {
+  "desktop": {
+   "canvas": {
+    "top": 56.125,
+    "bottom": 588.125,
+    "left": 241,
+    "right": 773,
+    "h": 532,
+    "w": 532
+   },
+   "caption": {
+    "top": 594.265625,
+    "bottom": 726.453125,
+    "left": 12,
+    "right": 667.484375,
+    "h": 132.1875,
+    "w": 655.484375
+   },
+   "panel": {
+    "top": 56,
+    "bottom": 768,
+    "left": 1014,
+    "right": 1354,
+    "h": 712,
+    "w": 340
+   },
+   "vh": 768,
+   "N": 1024,
+   "pageScroll": 0,
+   "panelScroll": 0,
+   "controls": 20,
+   "errors": [],
+   "labels": [
+    "geen schaduw: licht gaat door het centrum",
+    "helderder: hier beweegt het gas naar je toe",
+    "zwakker: hier beweegt het gas van je weg"
+   ],
+   "saturated": {
+    "framesShare": 0,
+    "discShare": 0
+   }
+  },
+  "phone": {
+   "canvas": {
+    "top": 54,
+    "bottom": 413,
+    "left": 8,
+    "right": 367,
+    "h": 359,
+    "w": 359
+   },
+   "caption": {
+    "top": 425,
+    "bottom": 645.3125,
+    "left": 8,
+    "right": 367,
+    "h": 220.3125,
+    "w": 359
+   },
+   "panel": {
+    "top": 686.859375,
+    "bottom": 1352.40625,
+    "left": 8,
+    "right": 367,
+    "h": 665.546875,
+    "w": 359
+   },
+   "vh": 812,
+   "N": 1024,
+   "pageScroll": 485,
+   "panelScroll": 0,
+   "controls": 20,
+   "errors": [],
+   "canvasAfterScroll": {
+    "top": 6,
+    "bottom": 365,
+    "left": 8,
+    "right": 367,
+    "h": 359,
+    "w": 359
+   }
+  }
+ }
+}

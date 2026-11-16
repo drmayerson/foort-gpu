@@ -6,7 +6,7 @@
 uniform highp sampler2D uSrc;
 uniform ivec4 uP;      // mode, source width, source height, downsampling level k of the source (P_TONE)
 uniform vec4 uBlur;    // direction x, y; sigma (texels); taps radius
-uniform vec4 uTone;    // exposure, tone map, colour map, 0
+uniform vec4 uTone;    // exposure, tone map (4: soft shoulder), colour map, 1: blended over a sky pass (alpha = brightness)
 uniform ivec4 uOrigin; // canvas pixel of the view's lower-left corner (P_TONE)
 uniform ivec4 uFull;   // full-resolution width and height of the view (P_TONE)
 out vec4 color;
@@ -62,7 +62,10 @@ void main() {
     if (tm == 1) v = sqrt(v);
     else if (tm == 2) v = log(1.0 + 99.0 * v) / log(100.0);
     else if (tm == 3) v = asinh(30.0 * v) / asinh(30.0);
+    else if (tm == 4) { float s = sqrt(v); v = s < 0.7 ? s : 0.7 + 0.3 * (1.0 - exp(-(s - 0.7) / 0.3)); }
     int cm = int(uTone.z + 0.5);
-    color = vec4(cm == 0 ? afmhot(v) : cm == 1 ? inferno(v) : vec3(clamp(v, 0.0, 1.0)), 1.0);
+    // alpha: the disc's tone-mapped brightness, so that blending (ONE, ONE_MINUS_SRC_ALPHA) over the sky pass gives
+    // disc + sky (1 - v), as the display pass without post passes (review U3)
+    color = vec4(cm == 0 ? afmhot(v) : cm == 1 ? inferno(v) : vec3(clamp(v, 0.0, 1.0)), uTone.w > 0.5 ? clamp(v, 0.0, 1.0) : 1.0);
   }
 }
