@@ -23,6 +23,7 @@
           <button type="button" id="hidePanel" class="secondary" title="hide or show the panel (h)">Hide panel</button>
           <button type="button" id="record" class="secondary" title="record a video at the Export settings (r)">Record video</button>
           <button type="button" id="resetView" class="secondary" title="forget the remembered view and load the defaults">Reset to defaults</button>
+          <button type="button" id="copyFixed" class="secondary" title="copy a link that traces at the quality tier and resolution used here, on any device">Copy link (fixed quality)</button>
           <a id="guideLink" href="https://github.com/drmayerson/foort-gpu/blob/main/README.md">Guide</a>
           <a href="./caps.html">Device capabilities</a>
           <a href="./bench/">Benchmark</a>
@@ -45,6 +46,7 @@
         <div id="scaleBar" class="scaleBar"><div class="sbLine"></div><span></span></div>
         <div id="marks" class="marks"></div>
         <div id="labels" class="labels" hidden></div>
+        <div id="cbar" class="cbar" hidden><div class="title"></div><canvas width="256" height="1"></canvas><div class="ticks"></div></div>
         <div id="progress" class="progress" hidden>
           <span id="progressText"></span>
           <div class="bar"><div id="progressBar"></div></div>
@@ -59,6 +61,7 @@
         <button type="button" id="warnLower" class="secondary">Lower resolution</button>
         <button type="button" id="warnTier" class="secondary">Use Normal quality</button>
       </div>
+      <div id="notes" class="notes" hidden></div>
       <p id="caption" class="caption"></p>
       <p class="captionTools"><button type="button" id="explain" class="secondary small" aria-pressed="false">What am I looking at?</button></p>
       <canvas id="lc" class="lc" width="800" height="160" hidden aria-label="light curve"></canvas>
@@ -77,6 +80,16 @@
           <figure><canvas id="inspXY" width="320" height="320"></canvas><figcaption>equatorial plane (x, y), units of M</figcaption></figure>
         </div>
         <div class="scroll"><table id="inspTable"></table></div>
+      </section>
+      <section id="dataBox">
+        <h2>Data</h2>
+        <p class="small">The view's data, with the view in the header: FITS (astropy.io.fits, ds9) and CSV.</p>
+        <p class="dataButtons">
+          <button type="button" id="dlIntensity" class="secondary small" title="linear disc intensity at the current time: total, n = 1, n = 2, n >= 3 and tail">Intensity (FITS)</button>
+          <button type="button" id="dlRecords" class="secondary small" title="the 24 floats per pixel of the full-resolution records">Records (FITS)</button>
+          <button type="button" id="dlLightCurve" class="secondary small">Light curve (CSV)</button>
+          <button type="button" id="dlRays" class="secondary small">Inspected rays (CSV)</button>
+        </p>
       </section>
       <section id="perfBox">
         <h2>Performance</h2>

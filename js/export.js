@@ -76,7 +76,9 @@ export function download(blob, name) {
 /**
  * PNG of the canvas, with optional burned-in overlays (lines of text at the bottom, a scale bar), and the URL embedded.
  * @param {HTMLCanvasElement} canvas the WebGL canvas (drawn with preserveDrawingBuffer)
- * @param {{url: string, overlay?: {lines: string[], bar?: {frac: number, label: string}}}} o
+ * @param {{url: string, texts?: Record<string, string>, overlay?: {lines: string[], bar?: {frac: number, label: string},
+ *   cbar?: {title: string, ticks: string[], color: (t: number) => number[]}}}} o
+ *   texts: more tEXt chunks (review E4: the commit and the resolved quality tier); cbar: a colour bar, bottom right (E6)
  * @returns {Promise<Uint8Array>}
  */
 export async function snapshotPng(canvas, o) {
@@ -96,10 +98,30 @@ export async function snapshotPng(canvas, o) {
       g.fillRect(fs * 0.6, y, w, Math.max(2, fs / 5));
       g.fillText(o.overlay.bar.label, fs * 0.6, y + fs * 1.15);
     }
+    if (o.overlay.cbar) {
+      // review E6: the colour bar of a scalar view, with its ticks and title
+      const cb = o.overlay.cbar, bw = Math.round(c.width * 0.36), bh = Math.max(6, Math.round(fs * 0.7));
+      const x0 = c.width - bw - fs * 0.6, y0 = c.height - fs * 2.4;
+      g.shadowBlur = 0;
+      for (let i = 0; i < bw; i++) {
+        const [r, gg, b] = cb.color(i / (bw - 1));
+        g.fillStyle = `rgb(${Math.round(255 * r)},${Math.round(255 * gg)},${Math.round(255 * b)})`;
+        g.fillRect(x0 + i, y0, 1, bh);
+      }
+      g.strokeStyle = '#fff'; g.strokeRect(x0, y0, bw, bh);
+      g.fillStyle = '#fff'; g.shadowBlur = 3;
+      g.fillText(cb.title, x0, y0 - fs * 0.4);
+      cb.ticks.forEach((tk, k) => {
+        const tx = x0 + (k / Math.max(1, cb.ticks.length - 1)) * bw - (k === cb.ticks.length - 1 ? g.measureText(tk).width : k === 0 ? 0 : g.measureText(tk).width / 2);
+        g.fillText(tk, tx, y0 + bh + fs * 1.05);
+      });
+    }
     src = c;
   }
   const blob = await new Promise((res, rej) => src.toBlob((b) => (b ? res(b) : rej(new Error('toBlob failed'))), 'image/png'));
-  return pngWithText(await /** @type {Blob} */ (blob).arrayBuffer(), 'foort-gpu-url', o.url);
+  let png = pngWithText(await /** @type {Blob} */ (blob).arrayBuffer(), 'foort-gpu-url', o.url);
+  for (const [k, v] of Object.entries(o.texts ?? {})) png = pngWithText(/** @type {ArrayBuffer} */ (png.buffer), k, v);
+  return png;
 }
 
 /** the best recording format this browser offers (null: none) */

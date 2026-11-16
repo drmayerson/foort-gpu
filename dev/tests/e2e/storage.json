@@ -1,0 +1,4 @@
+{
+ "cookies": [],
+ "origins": [{ "origin": "http://127.0.0.1:8765", "localStorage": [{ "name": "foort-gpu:groups", "value": "{\"Tracing\":true}" }] }]
+}

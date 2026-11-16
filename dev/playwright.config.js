@@ -13,6 +13,8 @@ export default defineConfig({
   workers: 4,
   use: {
     baseURL: `http://127.0.0.1:${PORT}/`,
+    // review E1: the expert panel's Tracing group is folded by default; tests start with it open (review9.spec.js tests the default)
+    storageState: 'tests/e2e/storage.json',
     channel: process.env.PW_CHANNEL ?? 'chrome',
     headless: process.env.PW_HEADED ? false : true,
     launchOptions: { args: ['--enable-unsafe-webgpu', '--enable-gpu', '--ignore-gpu-blocklist'] },

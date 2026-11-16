@@ -1741,3 +1741,20 @@ FOORT built from v1.0.0's sources (`sh tools/foort_parity/build.sh`). All M2 par
 - **To review and edit:** the captions and labels (`js/ui/i18n.js`).
 - **To judge:** the sky with the disc on top. Suggested views: field of view 60–200 M, viewing angle 75°, the Pillars or the Deep Field.
 - **The site repository (not changed here):** the homepage's Dutch card for FOORT-GPU says the viewer is in English ("in het Engels"). Its simple panel is now Dutch too.
+
+## Review package 9: expert tools (2026-11-16)
+
+| the review's target | result (`dev/tests/e2e/review9.spec.js`, `dev/tests/unit/review9.test.js`) |
+|---|---|
+| typed values for every slider | every range control: a = 0.9375, inc = 90 and a log slider (12.345) exactly; out-of-range values clamped |
+| `.npy` or FITS export round-trips in a test | FITS: the downloaded records equal the page's bit for bit (128² × 24); the intensity's total equals the sum of its orders to 1e-5; header has metric, camera, tier, commit |
+| commit hash and resolved tier in the PNG text chunk | `foort-gpu-commit` (40 hex + `+local` on a dev server), `foort-gpu-tier`, `foort-gpu-fixed-url` |
+
+- **Also:**
+  - folding expert groups with a filter box (Tracing folded at first, remembered);
+  - a notes box for clamps and warnings;
+  - colour bars;
+  - light curve and inspected rays as CSV;
+  - "Copy link (fixed quality)".
+- **Tests:** Vitest 167 and Playwright 63, in two clean runs; tsc clean.
+- **Deploying from now on:** after a merge into main, `node dev/scripts/stamp.mjs`, then commit `version.json`.

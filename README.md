@@ -81,6 +81,19 @@ The legend under the image explains the colours of each debug view. The performa
 - the fluid's ISCO, and the circular-orbit bands for horizonless metrics;
 - the trace time and the steps per ray.
 
+### Expert tools (review package 9)
+
+- **Panel:** the expert groups fold (remembered in this browser; Tracing is folded at first), and a filter box at the top shows only the controls whose name matches.
+- **Typed values:** click the value of any slider to type an exact one; Enter or leaving the field applies it, Esc cancels. Values outside the slider's range are clamped to it.
+- **Notes:** when a parameter was clamped to its valid range, the camera was moved out of an ergoregion, or the setup warns (for example no ISCO), a notes box under the image says so, in both panels.
+- **Colour bar:** the scalar debug views (redshift, delay, |H|, steps, noise) show a colour bar with ticks on the image, burned into snapshots with the other overlays.
+- **Data (expert panel, "Data"):**
+  - **Intensity (FITS):** the linear disc intensity at the current time, before exposure and without the beam: 4 planes (total, n = 1, n = 2, n ≥ 3 and the tail).
+  - **Records (FITS):** the 24 floats per pixel of the full-resolution records (the layout is in the header comments).
+  - **Light curve and inspected rays (CSV).**
+  - **FITS layout:** row 1 is the bottom of the image. The header has the code version, the metric and its parameters, the camera, the resolved quality tier, the emission and fluid settings and the view's link.
+- **Reproducibility:** `quality=auto` resolves per device. Snapshots carry the commit, the resolved tier and a link with the quality fixed in their PNG text chunks (`foort-gpu-commit`, `foort-gpu-tier`, `foort-gpu-fixed-url`), and "Copy link (fixed quality)" in the "More" menu gives that link. The performance table shows the code version.
+
 ### Export (Stage 1B B9)
 
 - **Snapshot** (button or `s`): a PNG of the image at trace resolution. Optionally the scale bar and the clock are burned in (Export panel).
@@ -199,6 +212,10 @@ npm test                           # Vitest unit tests (pure-math modules, in no
 npm run test:e2e                   # Playwright end-to-end tests in Chrome (serves the app with dev/scripts/serve.mjs)
 npm run typecheck                  # tsc --checkJs
 ```
+
+**Deploying:** GitHub Pages serves `main` as it is. After merging into `main`, stamp the version and commit it:
+`node dev/scripts/stamp.mjs` writes `version.json` with the merged commit, and the stamp commit changes only that file.
+The viewer reads it for the PNG text chunks, the FITS headers and the performance table; a local server adds `+local`.
 
 Validation scripts (reports in `dev/reports/m<N>/`), by milestone:
 

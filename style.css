@@ -130,3 +130,18 @@ button.small { padding: 2px 10px; font-size: 0.8rem; }
   .controls fieldset { padding: 4px 8px 8px; }
   #perfBox { font-size: 0.8rem; }
 }
+/* review package 9: folding expert groups, the filter box, typed slider values, notes, colour bar */
+.controls details.grp { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 10px; padding: 4px 12px 8px; background: var(--panel); }
+.controls details.grp > summary { cursor: pointer; font-weight: 600; font-size: 0.9rem; padding: 2px 0; }
+.controls details.grp[hidden] { display: none; }
+.ctlFilter { margin: 0 0 10px; }
+.ctlFilter input { width: 100%; }
+.ctl output.editable { cursor: text; border-bottom: 1px dotted var(--soft); }
+.ctl output.editable:hover, .ctl output.editable:focus { color: var(--accent); outline: none; }
+.ctl input.val { width: 7.5em; justify-self: end; padding: 1px 4px; font: inherit; font-variant-numeric: tabular-nums; }
+.notes { margin: 4px 0; padding: 6px 10px; border-left: 4px solid #d99a00; background: color-mix(in srgb, #d99a00 12%, var(--panel)); border-radius: 6px; font-size: 0.85rem; color: var(--fg); }
+.notes ul { margin: 2px 0 0; padding-left: 18px; }
+.cbar { position: absolute; right: 10px; bottom: 10px; width: 42%; max-width: 260px; pointer-events: none; color: #fff; font-size: 0.72rem; text-shadow: 0 0 3px #000; }
+.cbar canvas { display: block; width: 100%; height: 10px; border: 1px solid rgba(255, 255, 255, 0.7); border-radius: 2px; }
+.cbar .ticks { display: flex; justify-content: space-between; margin-top: 1px; }
+.cbar .title { margin-bottom: 2px; }

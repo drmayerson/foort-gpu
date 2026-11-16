@@ -539,3 +539,22 @@ User, verbatim where quoted:
   - **Choice:** `resAuto` (on by default) takes the smallest of 256², 512², 1024² that is at least 85% of the image's device pixels, halved while the predicted trace exceeds the tier's time target. It re-traces after a resize. A link with N, or setting N in the expert panel, turns it off, and the chosen N stays out of links (U10).
   - **Scaling:** smooth in the emission view, pixelated in the debug views.
 - **Drag previews:** the GPU budget is now 22 ms (was 20). 256² Kerr takes 19 ms here and fell back to 128² on a noisy measurement. 38 previews/s at 256².
+
+## Review package 9: expert tools (2026-11-16)
+
+- 2026-11-16 — **Package 9 started** (user: "continue with package 9 now"), on branch `review-9`.
+- 2026-11-16 — **E1:**
+  - **Groups:** the expert groups are folding `<details>`, remembered in localStorage (`foort-gpu:groups`), with Tracing folded at first.
+  - **Filter:** it matches a control's label, key and group, and opens the groups with matches while it is set.
+  - **Tests:** they start with the groups open (`tests/e2e/storage.json` in `playwright.config.js`), so the existing tests reach the Tracing controls; `review9.spec.js` tests the folded default on a fresh profile.
+- 2026-11-16 — **E2:** a slider's value display (`output`) becomes a number field on a click. The formatted display with units stays, since tests and the B8 units read it. A typed value is exact (not rounded to the slider's 1000 positions) and clamped to the slider's range; 0 on the λ slider is the λ = 0 switch.
+- 2026-11-16 — **E3:**
+  - **Format:** FITS, not `.npy`, because NumPy's `.npy` header accepts only its own three keys, so the view parameters could not go in it. The writer and reader (`js/fits.js`) are small: one primary HDU, a float32 cube, big-endian, row 1 at the bottom.
+  - **Content:** the intensity is the linear image drawn once through the post path without the beam, at the current observer time; the records are the full-resolution read-back.
+  - **Checks:** the unit tests write and read the format; the e2e test compares the downloaded records with the page's own, bit for bit. astropy is not installed here, so no third-party reader was run.
+- 2026-11-16 — **E4:**
+  - **The problem:** the site has no build step, so a page cannot know its own commit.
+  - **Version stamp:** `version.json` is written by `dev/scripts/stamp.mjs` after a merge and committed alone. The deployed file therefore names the commit whose code is served. Local servers add `+local`.
+  - **Where it appears:** snapshots carry tEXt chunks `foort-gpu-commit`, `foort-gpu-tier` (the resolved tier) and `foort-gpu-fixed-url` (quality and N fixed, resAuto off), and "Copy link (fixed quality)" in the menu gives the same link. The FITS headers and the performance table show the version.
+- 2026-11-16 — **E5:** clamps, camera moves and setup warnings get a notes box under the image in both panels; the status-line suffix stays for the expert panel and tests.
+- 2026-11-16 — **E6:** a colour bar on the image for the scalar views (g₁, delay, |H|, n = 1 delay, steps, noise), from the same inferno as the shaders, and burned into snapshots with the other overlays.

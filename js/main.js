@@ -22,6 +22,7 @@ import { loadNoiseField, autoNoiseField, noiseCover } from './noise/noiseField.j
 import { initialLang, setLang, saveLang, getLang, t } from './ui/i18n.js';
 import { captionText, labelSpots, renderLabels, helpRows, fitImage } from './ui/lay.js';
 import { skyImage, skyMode } from './sky.js';
+import { writeFits, csv } from './fits.js';
 
 const $ = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const DEG = Math.PI / 180;
@@ -126,6 +127,12 @@ const store = {
 async function main() {
   // review U2: English or Dutch (shared with the homepage)
   setLang(initialLang());
+  // review E4: the code version (version.json, stamped at deployment by dev/scripts/stamp.mjs); '+local' on a dev server
+  const isLocal = ['localhost', '127.0.0.1', '[::1]', ''].includes(location.hostname);
+  let version = { commit: 'unknown', short: 'unknown', date: '' };
+  fetch(new URL('../version.json', import.meta.url), { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => {
+    if (v) version = { ...v, short: v.short + (isLocal ? '+local' : ''), commit: v.commit + (isLocal ? '+local' : '') };
+  }).catch(() => {});
   // B7 persistence: the URL takes precedence; without one, the remembered view
   const stored = location.search.length > 1 ? null : store.get();
   const query = new URLSearchParams(stored ?? location.search);
@@ -378,7 +385,37 @@ async function main() {
     $('labelA').style.visibility = $('labelB').style.visibility = 'visible';
   };
 
+  /** review E6: inferno, as in the shaders @param {number} x @returns {number[]} */
+  const infernoRgb = (x) => {
+    const C = [[0.001, 0.0, 0.014], [0.159, 0.044, 0.329], [0.397, 0.083, 0.433], [0.623, 0.164, 0.388], [0.831, 0.283, 0.259], [0.962, 0.512, 0.054], [0.988, 0.998, 0.645]];
+    const u = Math.min(Math.max(x, 0), 1) * 6, i = Math.min(5, Math.floor(u)), f = u - i;
+    return C[i].map((c, k) => c + (C[i + 1][k] - c) * f);
+  };
+  /** the colour bar of the current scalar view (null: none) @returns {{title: string, ticks: string[], color: (t: number) => number[]}|null} */
+  const cbarSpec = () => {
+    const v = /** @type {any} */ (VIEWS)[state.view];
+    const lo = Number.isNaN(state.lo) ? v.lo : state.lo, hi = Number.isNaN(state.hi) ? v.hi : state.hi;
+    const f = (/** @type {number} */ x) => Number(x.toPrecision(3)).toString();
+    if (state.view === 'ham') return { title: v.label, ticks: [lo, (lo + hi) / 2, hi].map((x) => `1e${f(x)}`), color: infernoRgb };
+    if ('lo' in v) return { title: v.label, ticks: [lo, (lo + hi) / 2, hi].map(f), color: infernoRgb };
+    if (state.view === 'steps') return { title: 'steps (log scale)', ticks: ['1', f(Math.sqrt(state.maxSteps)), String(state.maxSteps)], color: infernoRgb };
+    if (state.view === 'noise') return { title: 'noise X at crossing 1', ticks: ['−4', '0', '4'], color: (x) => [x, x, x] };
+    return null;
+  };
+  const drawCbar = () => {
+    const cb = cbarSpec();
+    $('cbar').hidden = !cb;
+    if (!cb) return;
+    const cv = /** @type {HTMLCanvasElement} */ ($('cbar').querySelector('canvas'));
+    const g = /** @type {CanvasRenderingContext2D} */ (cv.getContext('2d'));
+    const im = g.createImageData(cv.width, 1);
+    for (let i = 0; i < cv.width; i++) { const c = cb.color(i / (cv.width - 1)); for (let k = 0; k < 3; k++) im.data[4 * i + k] = Math.round(255 * c[k]); im.data[4 * i + 3] = 255; }
+    g.putImageData(im, 0, 0);
+    /** @type {HTMLElement} */ ($('cbar').querySelector('.title')).textContent = cb.title;
+    /** @type {HTMLElement} */ ($('cbar').querySelector('.ticks')).innerHTML = cb.ticks.map((x) => `<span>${x}</span>`).join('');
+  };
   const legend = () => {
+    drawCbar();
     const items = /** @type {any} */ (LEGENDS)[state.view];
     const v = /** @type {any} */ (VIEWS)[state.view];
     $('legend').innerHTML = items
@@ -396,6 +433,7 @@ async function main() {
     const rays = st.N * st.N;
     $('perf').innerHTML =
       perfRow('GPU', String(caps.renderer)) +
+      perfRow('code', `${version.short}${version.date ? ` (${version.date.slice(0, 10)})` : ''}; quality resolved to ${tierNow}`) +
       perfRow('metric tables', bake) +
       perfRow('fluid', lastFluid ? `${lastFluid.stableBands ? 'banded' : "FOORT's model"}; ξ = ${lastFluid.params.xi}, β_r = ${lastFluid.params.betaR}, β_φ = ${lastFluid.params.betaPhi}; ISCO ${lastFluid.isco ? 'r = ' + lastFluid.isco.toFixed(4) : 'not found'}${lastFluid.iscoNote && !lastFluid.stableBands ? ` (${lastFluid.iscoNote})` : ''}${lastFluid.stableBands ? `; circular in ${lastFluid.stableBands.map((b) => `${b.from.toPrecision(3)}–${Number.isFinite(b.to) ? b.to.toPrecision(3) : '∞'}`).join(', ')}` : ''} (${lastFluid.ms.toFixed(0)} ms)` : '') +
       (lastFluid?.bands ? perfRow('circular orbits', bandText(lastFluid.bands)) : '') +
@@ -672,6 +710,9 @@ async function main() {
     if (!st) return;
     const notes = [...clamped, ...(cameraNote ? [cameraNote] : []), ...(res?.setup.warnings ?? [])];
     const note = notes.length ? ` — ${notes.join('; ')}` : '';
+    // review E5: clamps, the camera move and setup warnings in a box of their own under the image (both panels)
+    $('notes').hidden = !notes.length;
+    $('notes').innerHTML = notes.length ? `${t('notesIntro')}<ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul>` : '';
     const q = `quality ${/** @type {any} */ (TIER_LABELS)[tierNow] ?? tierNow}${state.quality === 'auto' ? ' (auto)' : ''}`;
     let nanShare = 0;
     if (final && coarse) {
@@ -727,7 +768,7 @@ async function main() {
   const applyPanel = () => {
     const normal = state.ui === 'normal';
     $('uiToggle').textContent = normal ? t('expertPanel') : t('normalPanel');
-    $('perfBox').hidden = normal;
+    $('perfBox').hidden = $('dataBox').hidden = normal;
     // review U1: the simple panel shows a plain caption; status, clock and legend belong to the expert panel
     for (const id of ['status', 'clock', 'legend']) $(id).hidden = normal;
     $('caption').hidden = $('presets').hidden = !normal;
@@ -907,7 +948,9 @@ async function main() {
     const u = unitsNow(), L = niceBelow(state.screen / 4);
     return snapshotPng(canvas, {
       url: location.href,
-      overlay: state.snapBurn ? { lines: [$('clock').textContent ?? ''], bar: { frac: L / state.screen / (state.compare === 'side' ? 2 : 1), label: `${L} M${u ? ` = ${(L * u.thetaUas).toPrecision(3)} µas` : ''}` } } : undefined,
+      texts: { 'foort-gpu-commit': version.commit, 'foort-gpu-tier': tierNow, 'foort-gpu-fixed-url': fixedUrl() },
+      overlay: state.snapBurn ? { lines: [$('clock').textContent ?? ''], bar: { frac: L / state.screen / (state.compare === 'side' ? 2 : 1), label: `${L} M${u ? ` = ${(L * u.thetaUas).toPrecision(3)} µas` : ''}` },
+        cbar: cbarSpec() ?? undefined } : undefined,
     });
   };
   const snapshot = async () => {
@@ -949,6 +992,71 @@ async function main() {
     $('progress').hidden = true;
     tObs = t0; draw(); $('clock').textContent = clockText();
   };
+  /** review E4: a link that traces at the tier and resolution used here on any device (quality=auto resolves per device) */
+  const fixedUrl = () => {
+    const s = { ...sideState('A'), quality: state.quality === 'auto' ? tierNow : state.quality, N: state.N, resAuto: false };
+    return `${location.origin}${location.pathname}?${stateToQuery(s)}`;
+  };
+  $('copyFixed').addEventListener('click', async () => {
+    const u = fixedUrl();
+    try { await navigator.clipboard.writeText(u); $('status').textContent = `copied a link with quality ${tierNow} and ${state.N}²`; }
+    catch { window.prompt('Link with fixed quality:', u); }
+  });
+  // review E3: the data of the view, with the view in the header
+  const fitsCards = () => {
+    const s = sideState('A'), id = metricIdFromState(s), { params } = metricParamsFromState(s);
+    const M = createMetric(id, params).massADM;
+    /** @type {import('./fits.js').Card[]} */
+    const cards = [
+      ['ORIGIN', 'FOORT-GPU', 'https://drmayerson.github.io/foort-gpu/'], ['CODE', version.short, 'code version (commit)'], ['COMMIT', version.commit.slice(0, 48)],
+      ['DATE', new Date().toISOString().slice(0, 19)], ['METRIC', id], ['MADM', M, 'ADM mass in the metric coordinates'],
+      ...Object.entries(params).map(([k, v]) => /** @type {import('./fits.js').Card} */ ([k.toUpperCase().slice(0, 8), v, 'metric parameter'])),
+      ['CAMR', s.r, 'camera distance (M)'], ['CAMINC', s.inc, 'inclination (deg)'], ['CAMAZ', s.az, 'azimuth (deg, display only)'],
+      ['SCREEN', s.screen, 'screen size (M)'], ['SCRCX', s.cx, 'screen centre alpha (M)'], ['SCRCY', s.cy, 'screen centre beta (M)'], ['NPIX', s.N],
+      ['QUALITY', s.quality], ['TIER', tierNow, 'resolved quality tier'], ['PATH', s.path], ['CROSSING', s.crossing],
+      ['TOBS', tObs, 'observer time (M)'], ['SIGMAN', s.timeAvg ? 0 : s.sigmaN, 'noise amplitude (0: time average)'], ['SLOWLITE', !!s.slowLight],
+      ['EMMU', s.mu], ['EMGAMMA', s.gamma], ['EMSIGMA', s.sigma], ['REDSHPOW', s.redshiftPower], ['FUDGE', s.fudge],
+      ['FLXI', s.xi, 'fluid sub-Keplerian xi'], ['FLBETAR', s.betaR], ['FLBETAP', s.betaPhi], ['FLMODEL', s.fluidModel],
+      ['ISCO', lastFluid?.isco ?? -1, 'fluid ISCO (coordinate r; -1: none)'],
+    ];
+    return cards;
+  };
+  const dataName = (/** @type {string} */ kind, /** @type {string} */ ext) => `${fileBase()}-${kind}.${ext}`;
+  $('dlIntensity').addEventListener('click', async () => {
+    if (state.compare !== 'off') { $('status').textContent = 'data export works with compare off'; return; }
+    // the linear intensity, drawn once through the post path (no beam) and read back
+    backend.display({ ...displayView(state, null), mode: VIEWS.emission.mode, post: { blurSigmaPx: 0, lightCurve: false } }, { side: 'A' });
+    const lin = await backend.readLinear('A');
+    requestDraw();
+    if (!lin) return;
+    const f = writeFits(lin.data, { w: lin.w, h: lin.h, planes: 4, interleaved: true, cards: [...fitsCards(),
+      ['BUNIT', 'relative', 'disc intensity before exposure'], ['PLANE1', 'total'], ['PLANE2', 'n = 1 (first crossing)'], ['PLANE3', 'n = 2'], ['PLANE4', 'n >= 3 and the binned tail']],
+    comments: [`view: ${location.href}`] });
+    download(new Blob([/** @type {Uint8Array<ArrayBuffer>} */ (f)], { type: 'application/fits' }), dataName('intensity', 'fits'));
+  });
+  $('dlRecords').addEventListener('click', async () => {
+    if (state.compare !== 'off') { $('status').textContent = 'data export works with compare off'; return; }
+    const rec = await backend.readRecords(1);
+    const N = Math.round(Math.sqrt(rec.length / RECORD_FLOATS));
+    const f = writeFits(rec, { w: N, h: N, planes: RECORD_FLOATS, interleaved: true, cards: fitsCards(),
+      comments: [`view: ${location.href}`,
+        'planes: 1 code + 16 * passes (code 1 horizon or inner cut, 2 escaped, 3 time out, 4 NaN, 5 singularity), 2 steps,',
+        '3 theta, 4 phi (escape direction; phi before the azimuth), 5-8 crossing 1 (r, phi, dt, g), 9-12 crossing 2, 13-16',
+        'crossing 3 (or |H| with storeH), 17-24 tail bins (packed weight and radius: js/gpu/traceConfig.js decodeTail)'] });
+    download(new Blob([/** @type {Uint8Array<ArrayBuffer>} */ (f)], { type: 'application/fits' }), dataName('records', 'fits'));
+  });
+  $('dlLightCurve').addEventListener('click', () => {
+    const text = csv(['t_M', 'total', 'n1', 'n2', 'n3_and_tail'], lcSeries.map((x) => [...x]));
+    download(new Blob([`# ${location.href}\n`, text], { type: 'text/csv' }), dataName('lightcurve', 'csv'));
+  });
+  $('dlRays').addEventListener('click', () => {
+    const rows = [];
+    for (const [k, r] of inspected.entries()) {
+      const p = r.cpu?.path ?? [];
+      for (let m = 0; m < p.length; m += 3) rows.push([k + 1, r.i, r.j, m / 3, p[m], p[m + 1], p[m + 2]]);
+    }
+    download(new Blob([`# ${location.href}\n`, csv(['ray', 'i', 'j', 'point', 'r', 'theta', 'phi'], rows)], { type: 'text/csv' }), dataName('rays', 'csv'));
+  });
   const toggleHelp = (/** @type {boolean|undefined} */ force = undefined) => { $('helpOverlay').hidden = force === undefined ? !$('helpOverlay').hidden : !force; };
   // the toolbar's "More" menu closes after a choice
   for (const el of Array.from($('menu').querySelectorAll('button'))) el.addEventListener('click', () => { /** @type {HTMLDetailsElement} */ ($('menu')).open = false; });
@@ -1102,6 +1210,9 @@ async function main() {
     /** review P4: probe runs this visit, and the first noise field's arrival */
     probes: () => probes,
     previews: () => ({ done: previewsDone, ...previewLast, gpu: [...previewGpu] }),
+    /** review E4: the code version; E3: the exported data as bytes (tests) */
+    version: () => ({ ...version }),
+    fixedUrl: () => fixedUrl(),
     noiseReady: () => firstNoise.then(() => true),
     /** set the observer time (units of M) and redraw */
     setTime(/** @type {number} */ t) { tObs = t; draw(); $('clock').textContent = clockText(); },

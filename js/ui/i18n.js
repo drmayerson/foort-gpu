@@ -92,6 +92,7 @@ const S = {
   calm: { en: ' The disc is shown averaged over time.', nl: ' De schijf is gemiddeld over de tijd getoond.' },
   flicker: { en: ' The flickering is turbulence in the gas.', nl: ' Het flikkeren is turbulentie in het gas.' },
   skyCredit: { en: ' Background: {credit}', nl: ' Achtergrond: {credit}' },
+  notesIntro: { en: 'Adjusted to keep the view valid:', nl: 'Aangepast om het beeld geldig te houden:' },
   // help
   helpTitle: { en: 'Mouse, touch and keyboard', nl: 'Muis, aanraken en toetsenbord' },
   close: { en: 'Close', nl: 'Sluiten' },

@@ -299,20 +299,40 @@ export function stateToQuery(s) {
  */
 export function buildControls(form, state, onChange) {
   form.innerHTML = '';
-  /** @type {Record<string, HTMLFieldSetElement>} */
+  /** @type {Record<string, HTMLDetailsElement>} */
   const groups = {};
   /** @type {{c:Control, row:HTMLElement, input:HTMLInputElement|HTMLSelectElement, out?:HTMLOutputElement}[]} */
   const widgets = [];
   // groups in a fixed order (the first appearance in CONTROLS would put Tracing before Camera)
   const ORDER = ['Spacetime', 'Camera', 'Disc emission', 'Time', 'Units', 'View', 'Compare', 'Export', 'Tracing'];
   const ordered = [...CONTROLS].sort((a, b) => (ORDER.indexOf(a.group) + 1 || 99) - (ORDER.indexOf(b.group) + 1 || 99));
+  // review E1: the expert groups fold (state remembered in this browser; Tracing folded by default) and a filter box
+  // shows only the controls whose label matches
+  const GROUP_KEY = 'foort-gpu:groups';
+  /** @type {Record<string, boolean>} */
+  let groupOpen = {};
+  try { groupOpen = JSON.parse(localStorage.getItem(GROUP_KEY) ?? '{}') ?? {}; } catch { /* none */ }
+  const filterRow = document.createElement('div');
+  filterRow.className = 'ctlFilter';
+  filterRow.innerHTML = '<input type="search" name="ctlFilter" placeholder="filter controls (e.g. step, noise, ISCO)" aria-label="filter controls">';
+  form.appendChild(filterRow);
+  const filterInput = /** @type {HTMLInputElement} */ (filterRow.firstChild);
+  let filterQ = '';
+  filterInput.addEventListener('input', () => { filterQ = filterInput.value.trim().toLowerCase(); refreshVisibility(); });
   for (const c of ordered) {
     if (c.level === 'hidden') continue;
     if (!groups[c.group]) {
-      const fs = document.createElement('fieldset');
-      fs.innerHTML = `<legend>${c.group}</legend>`;
+      const fs = document.createElement('details');
+      fs.className = 'grp';
+      fs.open = groupOpen[c.group] ?? c.group !== 'Tracing';
+      fs.innerHTML = `<summary>${c.group}</summary>`;
+      fs.addEventListener('toggle', () => {
+        if (filterQ) return;   // opened by the filter, not by the user
+        groupOpen[c.group] = fs.open;
+        try { localStorage.setItem(GROUP_KEY, JSON.stringify(groupOpen)); } catch { /* not available */ }
+      });
       form.appendChild(fs);
-      groups[c.group] = fs;
+      groups[c.group] = /** @type {any} */ (fs);
     }
     const row = document.createElement('label');
     row.className = `ctl ctl-${c.type}`;
@@ -355,6 +375,48 @@ export function buildControls(form, state, onChange) {
     if (out) row.appendChild(out);
     groups[c.group].appendChild(row);
     widgets.push({ c, row, input, out });
+    // review E2: click the value of a slider to type an exact one (Enter or leaving the field applies it, Esc cancels);
+    // values outside the slider's range are clamped to it
+    if (out) {
+      const o = out;
+      o.tabIndex = 0;
+      o.title = 'click to type a value';
+      o.classList.add('editable');
+      const edit = (/** @type {Event} */ ev) => {
+        ev.preventDefault();
+        if (row.querySelector('input.val')) return;
+        const f = document.createElement('input');
+        f.type = 'number'; f.className = 'val'; f.step = 'any';
+        f.value = c.zeroEnd && state[c.zeroEnd] ? '0' : String(state[c.key]);
+        o.hidden = true;
+        row.appendChild(f);
+        f.focus(); f.select();
+        let done = false;
+        const finish = (/** @type {boolean} */ apply) => {
+          if (done) return;
+          done = true;
+          const v = Number(f.value);
+          f.remove(); o.hidden = false;
+          if (!apply || f.value.trim() === '' || !Number.isFinite(v)) return;
+          if (c.zeroEnd && v === 0) {
+            if (!state[c.zeroEnd]) { state[c.zeroEnd] = true; sync(c.zeroEnd); refreshVisibility(); onChange(c.zeroEnd, true, true); }
+            return;
+          }
+          const x = Math.min(/** @type {number} */ (c.max), Math.max(/** @type {number} */ (c.min), v));
+          if (c.zeroEnd && state[c.zeroEnd]) { state[c.zeroEnd] = false; sync(c.zeroEnd); }
+          state[c.key] = x;
+          input.value = String(toSlider(c, x));
+          o.textContent = (c.format ?? String)(x);
+          sync(c.key);
+          refreshVisibility();
+          onChange(c.key, true, c.retrace !== false);
+        };
+        f.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') finish(false); });
+        f.addEventListener('blur', () => finish(true));
+      };
+      o.addEventListener('click', edit);
+      o.addEventListener('keydown', (e) => { if (e.key === 'Enter') edit(e); });
+    }
 
     const read = () => {
       if (c.type === 'checkbox') return /** @type {HTMLInputElement} */ (input).checked;
@@ -413,13 +475,19 @@ export function buildControls(form, state, onChange) {
   const refreshVisibility = () => {
     arrange();
     const normal = state.ui === 'normal';
+    filterRow.hidden = normal;
     for (const w of widgets) {
-      w.row.hidden = !levelShown(w.c) || (w.c.visible ? !w.c.visible(state) : false);
+      const match = !filterQ || normal || `${w.c.label} ${w.c.key} ${w.c.group}`.toLowerCase().includes(filterQ);
+      w.row.hidden = !levelShown(w.c) || (w.c.visible ? !w.c.visible(state) : false) || !match;
       const span = /** @type {HTMLElement} */ (w.row.firstChild);
       span.textContent = normal ? controlLabel(w.c.key) ?? span.dataset.normalLabel ?? span.dataset.label ?? '' : span.dataset.label ?? '';
       if (w.c.type === 'select') for (const op of Array.from(/** @type {HTMLSelectElement} */ (w.input).options)) op.textContent = (normal ? optionLabel(w.c.key, op.value) : null) ?? op.dataset.label ?? op.value;
     }
-    for (const fs of Object.values(groups)) fs.hidden = !Array.from(fs.querySelectorAll('.ctl')).some((r) => !(/** @type {HTMLElement} */ (r)).hidden);
+    for (const [g, fs] of Object.entries(groups)) {
+      fs.hidden = !Array.from(fs.querySelectorAll('.ctl')).some((r) => !(/** @type {HTMLElement} */ (r)).hidden);
+      if (filterQ && !fs.hidden) fs.open = true;
+      else if (!filterQ) fs.open = groupOpen[g] ?? g !== 'Tracing';
+    }
     moreDet.hidden = !normal || !Array.from(moreFs.querySelectorAll('.ctl')).some((r) => !(/** @type {HTMLElement} */ (r)).hidden);
   };
   /** show a state value in its widget */
