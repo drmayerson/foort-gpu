@@ -7,7 +7,7 @@ time on the GPU, after [FOORT](https://github.com/drmayerson/foort) (Daniel Maye
 - **Spacetimes:**
   - black holes: Kerr, Johannsen, Manko–Novikov and Reissner–Nordström;
   - the ST3Cr ring fuzzball of *Fuzzball Shadows* (arXiv:2103.12075), including its λ = 0 black hole.
-- **Disc:** FOORT's fluid model (GeneralCircularRadial), its Johnson-SU emission profile, and its redshift convention (an observer at infinity).
+- **Disc:** FOORT's fluid model (GeneralCircularRadial, as of FOORT v1.0.0: the ISCO is the outermost transition from stable to unstable circular orbits), its Johnson-SU emission profile, and its redshift convention (an observer at infinity).
 - **Time:** the disc flickers with a Gaussian random field from [inoisy](https://github.com/AFD-Illinois/inoisy) (Lee & Gammie 2021). Each image point shows the disc as it was when its light left ("slow light").
 
 The GPU computes in float32 and is meant for visualization; FOORT remains the science tool. Accuracy against FOORT
@@ -200,7 +200,7 @@ Validation scripts (reports in `dev/reports/m<N>/`), by milestone:
 | M1–M2 | `metricParity.mjs`, `runFoort.mjs`, `runCpuRef.mjs`, `compareFoort.mjs`: metric and CPU-reference parity with FOORT (need `tools/foort_parity/build.sh`) |
 | M3 | `m3Level2.mjs`, `m3Level3.mjs`, `m3Perf.mjs`: GPU vs CPU, analytic checks, timings |
 | M4 | `m4Level4.mjs`, `m4TableError.mjs`, `m4TableRays.mjs`, `m4Perf.mjs`: tabulated vs closed-form Kerr, table errors, bake and trace timings |
-| M5 | `fluidParity.mjs`, `m5FoortEmission.mjs`, `m5GpuVsFoort.mjs`: fluid model and disc intensities vs FOORT |
+| M5 | `fluidParity.mjs` (needs `sh tools/foort_parity/build.sh` first; review C6 added the multi-transition Manko–Novikov case),  `m5FoortEmission.mjs`, `m5GpuVsFoort.mjs`: fluid model and disc intensities vs FOORT |
 | M6 | `m6TableError.mjs`, `m6Level2.mjs`, `m6GpuVsFoort.mjs`, `m6Level3.mjs`, `m6Continuity.mjs`, `m6Passes.mjs`, `m6Steps.mjs`: fuzzball tables, GPU vs CPU and FOORT, λ = 0 shadow, λ → 0, crossings, steps |
 | M7–M8 | `m7Delays.mjs`, `m7Frames.mjs`; `tools/noise/inspect_field.py`: light delays, animations, noise fields |
 | M9 | `m9Perf.mjs`: acceptance timings |

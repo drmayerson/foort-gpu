@@ -11,8 +11,10 @@ SRC="$FOORT/FOORT/src"
 mkdir -p "$HERE/build"
 CXX="${CXX:-g++}"
 "$CXX" -std=c++17 -O2 -ffp-contract=off -D_USE_MATH_DEFINES -I"$SRC" \
-  "$HERE/metric_dump.cpp" "$SRC/Metric.cpp" "$SRC/Grid.cpp" "$SRC/Interpolator.cpp" \
-  "$SRC/InputOutput.cpp" "$SRC/Spline.cpp" \
+  "$HERE/metric_dump.cpp" "$SRC/Metric.cpp" "$SRC/InputOutput.cpp" "$SRC/Spline.cpp" \
   -o "$HERE/build/metric_dump"
-"$CXX" -std=c++17 -O2 -ffp-contract=off -D_USE_MATH_DEFINES -I"$SRC"   "$HERE/fluid_dump.cpp" "$SRC/DiagnosticsEmission.cpp" "$SRC/Metric.cpp" "$SRC/Grid.cpp" "$SRC/Interpolator.cpp"   "$SRC/InputOutput.cpp" "$SRC/Spline.cpp"   -o "$HERE/build/fluid_dump"
+# (FOORT 5421188 removed the rotating boson star and with it Grid.cpp and Interpolator.cpp)
+"$CXX" -std=c++17 -O2 -ffp-contract=off -D_USE_MATH_DEFINES -I"$SRC" \
+  "$HERE/fluid_dump.cpp" "$SRC/DiagnosticsEmission.cpp" "$SRC/Metric.cpp" "$SRC/InputOutput.cpp" "$SRC/Spline.cpp" \
+  -o "$HERE/build/fluid_dump"
 echo "built $HERE/build/metric_dump (FOORT at $FOORT, commit $(git -C "$FOORT" rev-parse --short HEAD 2>/dev/null || echo unknown))"

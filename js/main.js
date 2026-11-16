@@ -367,7 +367,7 @@ async function main() {
     $('perf').innerHTML =
       perfRow('GPU', String(caps.renderer)) +
       perfRow('metric tables', bake) +
-      perfRow('fluid', lastFluid ? `${lastFluid.stableBands ? 'banded' : "FOORT's model"}; ξ = ${lastFluid.params.xi}, β_r = ${lastFluid.params.betaR}, β_φ = ${lastFluid.params.betaPhi}; ISCO ${lastFluid.isco ? 'r = ' + lastFluid.isco.toFixed(4) : 'not found'}${lastFluid.stableBands ? `; circular in ${lastFluid.stableBands.map((b) => `${b.from.toPrecision(3)}–${Number.isFinite(b.to) ? b.to.toPrecision(3) : '∞'}`).join(', ')}` : ''} (${lastFluid.ms.toFixed(0)} ms)` : '') +
+      perfRow('fluid', lastFluid ? `${lastFluid.stableBands ? 'banded' : "FOORT's model"}; ξ = ${lastFluid.params.xi}, β_r = ${lastFluid.params.betaR}, β_φ = ${lastFluid.params.betaPhi}; ISCO ${lastFluid.isco ? 'r = ' + lastFluid.isco.toFixed(4) : 'not found'}${lastFluid.iscoNote && !lastFluid.stableBands ? ` (${lastFluid.iscoNote})` : ''}${lastFluid.stableBands ? `; circular in ${lastFluid.stableBands.map((b) => `${b.from.toPrecision(3)}–${Number.isFinite(b.to) ? b.to.toPrecision(3) : '∞'}`).join(', ')}` : ''} (${lastFluid.ms.toFixed(0)} ms)` : '') +
       (lastFluid?.bands ? perfRow('circular orbits', bandText(lastFluid.bands)) : '') +
       perfRow('image', `${st.N}² (levels ${st.levels.join(' → ')}, ${st.tiles} tiles)`) +
       perfRow('disc crossings', caps.tailBins ? `first 3 exact, the rest in ${caps.tailBins} log-r bins (no noise or slow light)` : `first 3 only: this device has ${caps.maxDrawBuffers} draw buffers (the binned tail needs 6)`) +

@@ -15,17 +15,20 @@ test.beforeEach(async ({ page }) => {
 
 test('metric switching traces every BH-mode metric on its path (B5 auto), and the tables when asked', async ({ page }) => {
   // Stage 1B B5 'auto': hand-written closed-form Kerr, generated Johannsen and RN, tabulated Manko-Novikov
+  // wait for the trace the change started, not a "done" still on screen from the last one (slow under parallel load)
+  const change = async (name, value) => {
+    const n = await page.evaluate(() => window.__foort.finals());
+    await page.selectOption(`select[name=${name}]`, value);
+    await page.waitForFunction((k) => window.__foort.finals() > k, n, { timeout: 60_000 });
+  };
   for (const [m, perf] of [['johannsen', 'generated closed-form shader (johannsen)'], ['reissnerNordstrom', 'generated closed-form shader (reissnerNordstrom)'],
     ['mankoNovikov', 'nodes'], ['kerr', 'hand-written closed-form Kerr']]) {
-    await page.selectOption('select[name=metric]', m);
-    await expect(page.locator('#status')).toContainText('done', { timeout: 60_000 });
+    await change('metric', m);
     await expect(page.locator('#perf')).toContainText(perf);
   }
-  await page.selectOption('select[name=path]', 'tabulated');
-  await expect(page.locator('#status')).toContainText('done', { timeout: 60_000 });
+  await change('path', 'tabulated');
   await expect(page.locator('#perf')).toContainText('nodes');
-  await page.selectOption('select[name=metric]', 'johannsen');
-  await expect(page.locator('#status')).toContainText('done', { timeout: 60_000 });
+  await change('metric', 'johannsen');
   await expect(page.locator('#perf')).toContainText('nodes');
 });
 

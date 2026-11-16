@@ -93,12 +93,15 @@ test('B7: compare layouts share the camera; side by side doubles the canvas; bli
   // b: show the other side by hand (blinking stops)
   const vis = () => page.evaluate(() => getComputedStyle(document.getElementById('labelA')).visibility);
   await page.locator('#view').focus();
-  const before = await vis();
+  // (the first press stops the blinking; the side it shows depends on when the last blink flipped, so the flip is
+  // checked on the second press)
   await page.keyboard.press('b');
-  await expect.poll(vis).toBe(before === 'visible' ? 'hidden' : 'visible');
+  await page.waitForTimeout(100);
   const after = await vis();
   await page.waitForTimeout(1200);   // no longer blinking
   expect(await vis()).toBe(after);
+  await page.keyboard.press('b');
+  await expect.poll(vis).toBe(after === 'visible' ? 'hidden' : 'visible');
   // expert: the panel edits B; A keeps its own settings
   await page.click('#uiToggle');
   await page.selectOption('select[name=cmpEdit]', 'B');

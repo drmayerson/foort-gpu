@@ -252,7 +252,9 @@ export function gpuTraceSetup(viewIn, tables, fluid) {
   uniforms.uFluidX = ['4f', [fluid.grid.xMin, fluid.grid.dx, fluid.grid.n, fluid.grid.r0]];
   const tail = tailGeometry(metric, v);
   uniforms.uTail = ['4f', [tail.xLo, tail.invWidth, tail.K, 0]];
-  return { program, uniforms, N: v.N, warnings: cam.warnings, metric, view: v, tables: tables ?? null, tableKey, fluid, fluidKey: fs.key, tail,
+  // FOORT's ISCO warnings (no ISCO, or one within 1% of a search bound; review C6), for its model (not the banded one)
+  const warnings = [...cam.warnings, ...(fluid?.iscoNote && !fluid.stableBands ? [`fluid: ${fluid.iscoNote}`] : [])];
+  return { program, uniforms, N: v.N, warnings, metric, view: v, tables: tables ?? null, tableKey, fluid, fluidKey: fs.key, tail,
     compact: program.includes('+compact') ? v.compact : null, maxSteps: v.maxSteps,
     // refinement lists pixels: it needs the compaction outputs; off with |H| in the third crossing slot
     refine: v.refine && !v.storeH ? { ...v.refine, M: metric.massADM, spacing: v.camera.screen / (v.N * v.camera.r) } : null };

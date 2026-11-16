@@ -133,32 +133,63 @@ export function createFluid(m, params) {
     return rdd;
   };
 
-  // FOORT FindISCO: bisection on the stability of circular orbits (in log r with RLogScale)
+  // FOORT FindISCO (v1.0.0, 0742057): the ISCO is the OUTERMOST transition from stable to unstable or no circular
+  // orbit. The upper bound must be stable; 200 points scanned inward (uniform in the search coordinate, log r with
+  // RLogScale) find the first one without a stable orbit; only that bracket is bisected. Review C6: the port used to
+  // bisect the whole interval, which picks a different transition when there are several (Manko-Novikov a = 0.94,
+  // alpha3 = 2: 1.443 instead of FOORT's 1.988).
   const toC = (/** @type {number} */ r) => (logScale ? Math.log(r) : r), toR = (/** @type {number} */ c) => (logScale ? Math.exp(c) : c);
-  let lo = toC(iscoLower), hi = toC(iscoUpper), cur = (lo + hi) / 2;
-  let exact = false;
-  for (let it = 0; hi - lo > 2 * DERIV_H && it < 1000 && !exact; it++) {
-    const rdd = stability(toR(cur));
-    let smaller;
-    if (rdd < 0) smaller = true; else if (rdd > 0) smaller = false; else if (rdd === 0) { exact = true; smaller = true; } else smaller = false;
-    if (!exact) { if (smaller) hi = cur; else lo = cur; cur = (lo + hi) / 2; }
+  /** FOORT's stability(x): a stable (or marginally stable) circular orbit exists (rdd <= 0); NaN (no orbit): false */
+  const stableAt = (/** @type {number} */ c) => stability(toR(c)) <= 0;
+  const lo = toC(iscoLower), hi = toC(iscoUpper);
+  let rIsco = NaN;
+  /** @type {Vec4} */
+  let pIsco = [0, 0, 0, 0];
+  let iscoExists = false;
+  /** FOORT's warning when no ISCO is found, or one within 1% of the search interval of a bound */
+  let iscoNote = '';
+  if (!stableAt(hi)) iscoNote = `no stable circular orbit at the ISCO upper bound r = ${iscoUpper}: no ISCO`;
+  else {
+    const NSCAN = 200;
+    let xs = hi, xu = NaN;
+    for (let k = 1; k <= NSCAN; k++) {
+      const x = hi - ((hi - lo) * k) / NSCAN;
+      if (!stableAt(x)) { xu = x; break; }
+      xs = x;
+    }
+    if (Number.isNaN(xu)) iscoNote = `all circular orbits between r = ${iscoLower} and ${iscoUpper} are stable: no ISCO`;
+    else {
+      for (let it = 0; xs - xu > 2 * DERIV_H && it < 1000; it++) {
+        const mid = (xs + xu) / 2;
+        if (stableAt(mid)) xs = mid; else xu = mid;
+      }
+      // the stable side of the bracket (a circular orbit exists there)
+      rIsco = toR(xs);
+      pIsco = circular(rIsco);
+      iscoExists = pIsco[0] < 0;
+      if (!iscoExists) iscoNote = 'finding the ISCO momentum failed: no ISCO';
+      else {
+        const tol = 0.01 * (hi - lo);
+        if (xs - lo < tol || hi - xs < tol) iscoNote = `ISCO r = ${rIsco.toPrecision(6)} lies within 1% of the search interval of its ${xs - lo < tol ? 'lower' : 'upper'} bound: the true ISCO may lie outside it`;
+      }
+    }
   }
-  const rIsco = toR(exact ? cur : hi);
-  const pIsco = circular(rIsco);
-  const iscoExists = pIsco[0] < 0;
 
   /** FOORT GetInsideISCOCircularVelocityd: ISCO E, L and radial infall */
   const insideIsco = (/** @type {number} */ r) => {
     const u = inv(r);
     const t2 = -1 - u.gtt * pIsco[0] * pIsco[0] - 2 * u.gtphi * pIsco[0] * pIsco[3] - u.gphiphi * pIsco[3] * pIsco[3];
-    const pr = -1 / Math.sqrt(u.grr) * Math.sqrt(Math.max(t2, 0));
+    // FOORT db6a7e1: no solution when p_r^2 < 0 (the flow is then the radial infall), no longer clamped to p_r = 0
+    if (t2 < 0) return /** @type {Vec4} */ ([0, 0, 0, 0]);
+    const pr = -1 / Math.sqrt(u.grr) * Math.sqrt(t2);
     return /** @type {Vec4} */ (Number.isNaN(pr) ? [0, 0, 0, 0] : [pIsco[0], pr, 0, pIsco[3]]);
   };
   /** plunge with the E and L of the covariant circular velocity pEdge (FOORT's inside-ISCO construction, per band) */
   const plunge = (/** @type {Vec4} */ pEdge, /** @type {number} */ r) => {
     const u = inv(r);
     const t2 = -1 - u.gtt * pEdge[0] * pEdge[0] - 2 * u.gtphi * pEdge[0] * pEdge[3] - u.gphiphi * pEdge[3] * pEdge[3];
-    const pr = -1 / Math.sqrt(u.grr) * Math.sqrt(Math.max(t2, 0));
+    if (t2 < 0) return /** @type {Vec4} */ ([0, 0, 0, 0]);   // as FOORT's inside-ISCO rule (db6a7e1)
+    const pr = -1 / Math.sqrt(u.grr) * Math.sqrt(t2);
     return /** @type {Vec4} */ (Number.isNaN(pr) ? [0, 0, 0, 0] : [pEdge[0], pr, 0, pEdge[3]]);
   };
   /** FOORT GetRadialVelocityd: radial infall with E = 1, L = 0 (g^tr = 0 for these metrics) */
@@ -255,6 +286,8 @@ export function createFluid(m, params) {
   return {
     params: { xi, betaR, betaPhi, iscoLower, iscoUpper, model },
     isco: iscoExists ? rIsco : null,
+    /** FOORT's ISCO warning (no ISCO, or one near a search bound), '' if none */
+    iscoNote,
     /** banded model: the stable bands [from, to] (from = marginally stable inner edge) */
     stableBands: stableBands ? stableBands.map((b) => ({ from: b.from, to: b.to })) : null,
     circularBands,

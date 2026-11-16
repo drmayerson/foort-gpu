@@ -1,7 +1,7 @@
 # FOORT parity harness
 
-`metric_dump.cpp` links FOORT's own `Metric.cpp` (plus `Grid`, `Interpolator`, `Spline`,
-`InputOutput`) from a local, unmodified FOORT clone and prints `g_dd` and `g_uu` at given
+`metric_dump.cpp` links FOORT's own `Metric.cpp` (plus `Spline` and
+`InputOutput`; FOORT before 5421188 also needed `Grid` and `Interpolator`) from a local, unmodified FOORT clone and prints `g_dd` and `g_uu` at given
 `(r, theta)` points, always in FOORT's normal `r` coordinate.
 
 ```

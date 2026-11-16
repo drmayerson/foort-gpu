@@ -14,6 +14,7 @@ export const FLUID_NODES = 2048;
  * @property {Float32Array} data     FLUID_NODES * 4 floats: [1/u^t, u^r/u^t, Omega, 0]
  * @property {{xMin:number, dx:number, n:number, r0:number}} grid
  * @property {number|null} isco
+ * @property {string} [iscoNote]  FOORT's ISCO warning ('' if none; review C6)
  * @property {{xi:number, betaR:number, betaPhi:number}} params
  * @property {number} ms
  * @property {number} M             M_ADM of the metric
@@ -44,7 +45,7 @@ export function bakeFluid(m, fluidParams, range) {
   }
   // FOORT's bisection assumes one unstable -> stable transition; horizonless metrics can have several (reported)
   const bands = r0 === 0 ? f.circularBands(range.rTerm, Math.min(range.rMax, 1000 * m.massADM), 200) : null;
-  return { data, grid: { xMin, dx, n, r0 }, isco: f.isco, params: f.params, ms: performance.now() - t0, M: m.massADM, bands, stableBands: f.stableBands };
+  return { data, grid: { xMin, dx, n, r0 }, isco: f.isco, iscoNote: f.iscoNote, params: f.params, ms: performance.now() - t0, M: m.massADM, bands, stableBands: f.stableBands };
 }
 
 /** Circumferential radius sqrt(g_phiphi) on the equator at r, linear in the table as the display shader. @param {FluidTable} T @param {number} r */

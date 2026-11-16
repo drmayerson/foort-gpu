@@ -1666,3 +1666,27 @@ The viewer's final traces of the default Kerr view, median of 5 (`dev/scripts/r2
 
 - Package 6 (fluid parity, C6) and package 9 (expert tools) need no decisions.
 - Packages 7-8 (lay panel, layout) wait on the user, as do P2 (tier policy), U2 (Dutch) and E7 (physics options).
+
+## External review, package 6 (2026-11-16, repository `drmayerson/foort-gpu`)
+
+### Fluid parity against FOORT v1.0.0 (C6)
+
+`node dev/scripts/fluidParity.mjs` (`dev/reports/m5/fluid_parity.json`; build the harness first with `sh tools/foort_parity/build.sh`), 8 metrics × 4 fluids:
+
+| case | ISCO JS / FOORT (before → after) | u_μ max rel. difference |
+|---|---|---|
+| Manko–Novikov a = 0.94, α₃ = 2 (two stable bands) | 1.442845 / 1.987852 → 1.987715 / 1.987852 (7e-5) | 1/1/1: 5e-8; 0.7/0.5/0.3: 1.2e-3 just inside the ISCO |
+| Manko–Novikov a = 0.5, α₃ = 0.5 | 4.232706 / 4.232708 | 1/1/1: 0.98 → 8e-8 (FOORT's new inside-ISCO rule) |
+| Kerr (4 spins), Johannsen (2) | agree to ≤ 3e-6, as before | ≤ 5e-6 |
+
+- **Within ~1e-3 M inside the ISCO,** sub-Keplerian fluids differ by up to 1.2e-3: the plunge there is sensitive to the ISCO's E and L. Samples in one code's radial-fallback shell only (one each in two cases) are counted and left out.
+- **The viewer's images are unchanged:** within the viewer's parameter ranges, the old and new searches agree.
+
+### Tests
+
+- Vitest 165 (new: `review6.test.js`, the search, both no-ISCO exits, the near-bound warning) and Playwright 51, in two clean runs; tsc clean.
+
+### Next
+
+- A full check of the port against FOORT v1.0.0 (user, 2026-11-16). FOORT changed much more since the port's parity runs: the adaptive step, the camera vielbein, RLogScale on by default, metric parameter checks, NaN termination, the mesh and the flat-space metric.
+- Packages 7-8 wait on the user.

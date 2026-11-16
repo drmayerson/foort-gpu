@@ -1,6 +1,9 @@
 // M5: FOORT GeneralCircularRadialFluid (tools/foort_parity/build/fluid_dump) vs the JS port
 // (js/fluid/generalCircularRadial.js): ISCO radius and covariant four-velocity at radii from the
 // termination radius to 1000.
+// Review C6 (2026-11-16): against FOORT v1.0.0, whose ISCO is the outermost stable -> unstable transition (a scan
+// inward from the upper bound, then bisection of that bracket). Manko-Novikov a = 0.94, alpha3 = 2 has two stable
+// bands in the search interval and is the multi-transition case.
 // Usage (from dev/): node scripts/fluidParity.mjs  -> dev/reports/m5/fluid_parity.json
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -29,23 +32,35 @@ for (const [id, params, cli] of CASES) for (const [xi, br, bp] of FLUIDS) {
   if (run.status !== 0) throw new Error(`fluid_dump failed: ${run.stderr}`);
   const res = run.stdout, desc = run.stderr;
   const f = createFluid(m, { xi, betaR: br, betaPhi: bp });
-  let worst = 0, worstR = 0;
+  // ISCO from FOORT's description string ("ISCO = 6.000000", six decimals)
+  const mm = /ISCO = ([0-9.eE+-]+)/.exec(desc);
+  const iscoFOORT = mm ? Number(mm[1]) : null;
+  // review C6: radii between the two ISCOs are circular in one code and plunging in the other; left out, and counted
+  const gapLo = Math.min(f.isco ?? Infinity, iscoFOORT ?? Infinity) - 1e-6, gapHi = Math.max(f.isco ?? -Infinity, iscoFOORT ?? -Infinity) + 1e-6;
+  let worst = 0, worstR = 0, inGap = 0, inShell = 0;
   for (const line of res.trim().split('\n')) {
     const [r, ut, ur, , up] = line.split(',').map(Number);
+    if ((br > 0 || bp > 0) && r >= gapLo && r <= gapHi) { inGap++; continue; }
     const d = f.velocity(r).down;
+    // FOORT db6a7e1: just inside an ISCO a little outside the true one, the plunge has no solution and the flow is the
+    // radial infall (u_phi = 0); the shell is ~1e-4 M wide in FOORT and narrower in the JS port, whose ISCO is closer.
+    // A sample in one code's shell only is counted, not compared
+    if (bp > 0 && r < gapHi + 1e-3 && (up === 0) !== (d[3] === 0)) { inShell++; continue; }
     const sc = Math.abs(ut) + Math.abs(up) / r + Math.abs(ur);
     const e = Math.max(Math.abs(d[0] - ut), Math.abs(d[1] - ur), Math.abs(d[3] - up) / r) / sc;
     if (e > worst) { worst = e; worstR = r; }
   }
-  out.push({ metric: id, params, fluid: { xi, betaR: br, betaPhi: bp }, iscoJS: f.isco, iscoFOORTdesc: desc.trim(), maxRelVelocityDiff: worst, atR: worstR, iscoKerr: id === 'kerr' ? kerrISCO(params.a) : null });
+  // stable -> unstable transitions inside the ISCO search interval (FOORT takes the outermost)
+  const bands = f.circularBands(f.params.iscoLower, f.params.iscoUpper, 2000);
+  const transitions = bands.filter((b, i) => i > 0 && b.kind !== 'stable' && bands[i + 1]?.kind === 'stable').length;
+  out.push({ metric: id, params, fluid: { xi, betaR: br, betaPhi: bp }, iscoJS: f.isco, iscoFOORT, iscoRelDiff: f.isco && iscoFOORT ? Math.abs(f.isco / iscoFOORT - 1) : null,
+    iscoNoteJS: f.iscoNote, transitions, maxRelVelocityDiff: worst, atR: worstR, samplesBetweenIscos: inGap, samplesInFallbackShell: inShell, iscoKerr: id === 'kerr' ? kerrISCO(params.a) : null });
 }
-// ISCO from FOORT's description string ("ISCO = 6.000000")
 for (const o of out) {
-  const mm = /ISCO = ([0-9.eE+-]+)/.exec(o.iscoFOORTdesc);
-  o.iscoFOORT = mm ? Number(mm[1]) : null;
-  delete o.iscoFOORTdesc;
   const e = (x) => (Number.isFinite(x) ? x.toExponential(1) : '—');
-  console.log(`${o.metric} ${JSON.stringify(o.params)} fluid ${o.fluid.xi}/${o.fluid.betaR}/${o.fluid.betaPhi}: ISCO JS ${o.iscoJS?.toFixed(6)} FOORT ${o.iscoFOORT?.toFixed(6)}${o.iscoKerr ? ` analytic ${o.iscoKerr.toFixed(6)}` : ''}; u_mu max rel diff ${e(o.maxRelVelocityDiff)} at r = ${o.atR.toPrecision(4)}`);
+  console.log(`${o.metric} ${JSON.stringify(o.params)} fluid ${o.fluid.xi}/${o.fluid.betaR}/${o.fluid.betaPhi}: ISCO JS ${o.iscoJS?.toFixed(6)} FOORT ${o.iscoFOORT?.toFixed(6)} (rel ${e(o.iscoRelDiff)})`
+    + `${o.iscoKerr ? `, analytic ${o.iscoKerr.toFixed(6)}` : ''}${o.transitions > 1 ? `, ${o.transitions} stable bands` : ''}; u_mu max rel diff ${e(o.maxRelVelocityDiff)} at r = ${o.atR.toPrecision(4)}`
+    + `${o.samplesBetweenIscos ? ` (${o.samplesBetweenIscos} sample(s) between the ISCOs left out)` : ''}${o.samplesInFallbackShell ? ` (${o.samplesInFallbackShell} in a radial-fallback shell left out)` : ''}${o.iscoNoteJS ? `; JS note: ${o.iscoNoteJS}` : ''}`);
 }
 mkdirSync(resolve(here, '../reports/m5'), { recursive: true });
 writeFileSync(resolve(here, '../reports/m5/fluid_parity.json'), JSON.stringify(out, null, 1));
